@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  db-sql:
+    image: postgres
+    container_name: db-sql
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER} -d ${DB_NAME}']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  db-redis:
+    image: redis
+    container_name: db-redis
+    ports:
+      - '6379:6379'
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 30

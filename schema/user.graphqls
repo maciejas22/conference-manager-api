@@ -1,0 +1,28 @@
+enum Role {
+  Organizer
+  Participant
+}
+
+type User {
+  id: ID!
+  name: String
+  surname: String
+  username: String
+  email: String!
+  role: Role!
+}
+
+extend type Query {
+  user: User
+}
+
+input UpdateUserInput {
+  name: String!
+  surname: String!
+  username: String!
+  email: String!
+}
+
+extend type Mutation {
+  updateUser(updateUserInput: UpdateUserInput!): User @authenticated
+}

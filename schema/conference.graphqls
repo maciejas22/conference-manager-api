@@ -1,0 +1,101 @@
+scalar Time
+
+enum ConferenceField {
+  TITLE
+  DATE
+  LOCATION
+  PARTICIPANTS_COUNT
+}
+
+input ConferenceFilter {
+  associatedOnly: Boolean
+  title: String
+}
+
+type Conference {
+  id: ID!
+  title: String!
+  date: Time!
+  location: String!
+  additionalInfo: String
+  agenda: [AgendaItem!]!
+  participantsCount: Int!
+  participantsLimit: Int
+  registrationDeadline: Time
+}
+
+type ConferencePage {
+  data: [Conference!]!
+  meta: ConferenceMeta!
+}
+
+type ConferenceMeta {
+  page: PageInfo!
+}
+
+type AgendaItem {
+  id: ID!
+  startTime: Time!
+  endTime: Time!
+  event: String!
+  speaker: String!
+}
+
+input CreateAgendaItemInput {
+  startTime: Time!
+  endTime: Time!
+  event: String!
+  speaker: String!
+}
+
+input CreateConferenceInput {
+  title: String!
+  date: Time!
+  location: String!
+  additionalInfo: String
+  participantsLimit: Int
+  registrationDeadline: Time
+  agenda: [CreateAgendaItemInput!]!
+}
+
+input ModifyAgendaItemInput {
+  id: ID
+  startTime: Time!
+  endTime: Time!
+  event: String!
+  speaker: String!
+  _destroy: Boolean
+}
+
+input ModifyConferenceInput {
+  id: ID!
+  title: String
+  date: Time
+  location: String
+  additionalInfo: String
+  participantsLimit: Int
+  registrationDeadline: Time
+  agenda: [ModifyAgendaItemInput!]
+}
+
+extend type Query {
+  conferences(
+    page: Page
+    sort: Sort
+    filters: ConferenceFilter
+  ): ConferencePage @authenticated
+  conference(id: ID!): Conference @authenticated
+  isParticipant(conferenceId: ID!): Boolean @hasRole(role: Participant)
+  isOrganizer(conferenceId: ID!): Boolean @hasRole(role: Organizer)
+}
+
+extend type Mutation {
+  createConference(createConferenceInput: CreateConferenceInput!): Conference
+    @hasRole(role: Organizer)
+  modifyConference(input: ModifyConferenceInput!): Conference
+    @hasRole(role: Organizer)
+  addUserToConference(conferenceId: String!): Conference
+    @hasRole(role: Participant)
+  removeUserFromConference(conferenceId: String!): Conference
+    @hasRole(role: Participant)
+}
