@@ -3,41 +3,30 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
-	"time"
+	"strconv"
 
-	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
 
 	"github.com/maciejas22/conference-manager/api/db"
-	"github.com/maciejas22/conference-manager/api/directives"
-	"github.com/maciejas22/conference-manager/api/graph"
-	"github.com/maciejas22/conference-manager/api/internal/auth"
-	"github.com/maciejas22/conference-manager/api/resolvers"
+	"github.com/maciejas22/conference-manager/api/internal/config"
+	"github.com/maciejas22/conference-manager/api/internal/directives"
+	"github.com/maciejas22/conference-manager/api/internal/graph"
+	"github.com/maciejas22/conference-manager/api/internal/middlewares"
+	"github.com/maciejas22/conference-manager/api/internal/resolvers"
+	"github.com/maciejas22/conference-manager/api/pkg/s3"
 )
 
-const defaultPort = "8080"
-
-func Middleware() func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r = r.WithContext(context.WithValue(r.Context(), "ResponseWriter", w))
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
 func main() {
-	ctx := context.Background()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = defaultPort
-	}
+	ctx := context.Background()
+	config.LoadConfig()
 
 	r := chi.NewRouter()
 	r.Use(cors.New(cors.Options{
@@ -48,43 +37,29 @@ func main() {
 		Debug:            true,
 	}).Handler)
 
-	db, err := db.Connect(ctx)
+	db, err := db.Connect(ctx, logger)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		logger.Error("failed to connect to database", "error", err)
 	}
 	defer db.Close()
 
-	r.Use(Middleware())
-	r.Use(auth.Middleware())
+	s3, err := s3.NewS3Client(logger)
+	if err != nil {
+		logger.Error("failed to connect to s3", "error", err)
+	}
 
-	resolver := resolvers.NewResolver(ctx, db)
+	middlewares.LoadMiddlewares(r)
+
+	resolver := resolvers.NewResolver(ctx, db, s3)
 	c := graph.Config{Resolvers: resolver}
 	c.Directives.Authenticated = directives.Authenticated
 	c.Directives.HasRole = directives.HasRole
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(c))
 
-	srv.AroundOperations(
-		func(ctx context.Context, next graphql.OperationHandler) graphql.ResponseHandler {
-			rc := graphql.GetOperationContext(ctx)
-			operationName := rc.Operation.Name
-			startTime := time.Now()
-
-			response := next(ctx)
-
-			executionTime := time.Since(startTime)
-
-			log.Printf(
-				"Operation: %s took %v",
-				operationName,
-				executionTime,
-			)
-			return response
-		},
-	)
-
 	r.Handle("/graphiql", playground.Handler("GraphQL playground", "/graphql"))
 	r.Handle("/graphql", srv)
 
-	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
-	log.Fatal(http.ListenAndServe(":"+port, r))
+	port := config.AppConfig.Port
+	log.Printf("connect to http://localhost:%d/ for GraphQL playground", port)
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(port), r))
 }

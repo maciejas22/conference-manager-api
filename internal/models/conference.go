@@ -2,8 +2,6 @@ package models
 
 import (
 	"time"
-
-	"github.com/maciejas22/conference-manager/api/db/repositories"
 )
 
 type Conference struct {
@@ -23,15 +21,4 @@ type Conference struct {
 type ConferenceFilter struct {
 	AssociatedOnly *bool   `json:"associatedOnly,omitempty"`
 	Title          *string `json:"title,omitempty"`
-}
-
-func (f *ConferenceFilter) ToRepo() *repositories.ConferenceFilter {
-	if f == nil {
-		return nil
-	}
-
-	return &repositories.ConferenceFilter{
-		AssociatedOnly: f.AssociatedOnly,
-		Title:          f.Title,
-	}
 }

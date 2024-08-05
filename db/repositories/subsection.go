@@ -1,11 +1,10 @@
 package repositories
 
 import (
-	"context"
 	"errors"
 	"log"
 
-	"github.com/maciejas22/conference-manager/api/db"
+	"github.com/jmoiron/sqlx"
 )
 
 type Subsection struct {
@@ -19,27 +18,11 @@ func (s *Subsection) TableName() string {
 	return "public.subsections"
 }
 
-type SubsectionRepository interface {
-	GetSubsections(sectionId string) ([]Subsection, error)
-}
-
-type subsectionRepository struct {
-	ctx context.Context
-	db  *db.DB
-}
-
-func NewSubsectionRepository(ctx context.Context, db *db.DB) SubsectionRepository {
-	return &subsectionRepository{
-		ctx: ctx,
-		db:  db,
-	}
-}
-
-func (r *subsectionRepository) GetSubsections(sectionId string) ([]Subsection, error) {
+func GetToSSubsections(tx *sqlx.Tx, sectionId string) ([]Subsection, error) {
 	var subsections []Subsection
 	s := &Subsection{}
 	query := "SELECT id, section_id, title, content FROM " + s.TableName() + " WHERE section_id = $1"
-	err := r.db.SqlConn.Select(
+	err := tx.Select(
 		&subsections,
 		query,
 		sectionId,

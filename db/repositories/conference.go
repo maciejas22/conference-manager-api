@@ -1,20 +1,22 @@
 package repositories
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log"
 
-	"github.com/maciejas22/conference-manager/api/db"
+	"github.com/jmoiron/sqlx"
 	filters "github.com/maciejas22/conference-manager/api/db/repositories/shared"
 )
 
 type Conference struct {
 	Id                   string  `json:"id" db:"id"`
 	Title                string  `json:"title" db:"title"`
-	Date                 string  `json:"date" db:"date"`
+	StartDate            string  `json:"start_date" db:"start_date"`
+	EndDate              string  `json:"end_date" db:"end_date"`
 	Location             string  `json:"location" db:"location"`
+	Website              *string `json:"website,omitempty" db:"website"`
+	Acronym              *string `json:"acronym,omitempty" db:"acronym"`
 	AdditionalInfo       *string `json:"additional_info,omitempty" db:"additional_info"`
 	ParticipantsLimit    *int    `json:"participants_limit,omitempty" db:"participants_limit"`
 	RegistrationDeadline *string `json:"registration_deadline,omitempty" db:"registration_deadline"`
@@ -29,29 +31,10 @@ type ConferenceFilter struct {
 	AssociatedOnly *bool   `json:"associatedOnly,omitempty"`
 }
 
-type ConferenceRepository interface {
-	GetConference(conferenceId string) (Conference, error)
-	GetConferences(page filters.Page, sort *filters.Sort, filters *ConferenceFilter) ([]Conference, filters.PaginationMeta, error)
-	CreateConference(conference Conference, organizerId string) (Conference, error)
-	UpdateConference(conference Conference) (Conference, error)
-}
-
-type conferenceRepository struct {
-	ctx context.Context
-	db  *db.DB
-}
-
-func NewConferenceRepository(ctx context.Context, db *db.DB) ConferenceRepository {
-	return &conferenceRepository{
-		ctx: ctx,
-		db:  db,
-	}
-}
-
-func (r *conferenceRepository) GetConference(conferenceId string) (Conference, error) {
+func GetConference(tx *sqlx.Tx, conferenceId string) (Conference, error) {
 	var conference Conference
-	query := "SELECT id, title, date, location, additional_info, participants_limit, registration_deadline FROM " + conference.TableName() + " WHERE id = $1"
-	err := r.db.SqlConn.Get(
+	query := "SELECT id, title, start_date, end_date, location, additional_info, acronym, website, participants_limit, registration_deadline FROM " + conference.TableName() + " WHERE id = $1"
+	err := tx.Get(
 		&conference,
 		query,
 		conferenceId,
@@ -62,12 +45,12 @@ func (r *conferenceRepository) GetConference(conferenceId string) (Conference, e
 	return conference, nil
 }
 
-func (r *conferenceRepository) GetConferences(p filters.Page, s *filters.Sort, f *ConferenceFilter) ([]Conference, filters.PaginationMeta, error) {
+func GetAllConferences(tx *sqlx.Tx, p filters.Page, s *filters.Sort, f *ConferenceFilter) ([]Conference, filters.PaginationMeta, error) {
 	var conferences []Conference
 	var totalItems int
 	c := &Conference{}
 
-	query := "SELECT id, title, date, location, additional_info, participants_limit, registration_deadline FROM " + c.TableName()
+	query := "SELECT id, title, start_date, end_date, location, website, acronym, additional_info, participants_limit, registration_deadline FROM " + c.TableName()
 	countQuery := "SELECT COUNT(*) FROM " + c.TableName()
 
 	whereClause := " WHERE 1=1"
@@ -91,12 +74,12 @@ func (r *conferenceRepository) GetConferences(p filters.Page, s *filters.Sort, f
 	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argCounter, argCounter+1)
 	queryArgs = append(queryArgs, p.PageSize, offset)
 
-	err := r.db.SqlConn.Get(&totalItems, countQuery, queryArgs[:len(queryArgs)-2]...)
+	err := tx.Get(&totalItems, countQuery, queryArgs[:len(queryArgs)-2]...)
 	if err != nil {
 		return nil, filters.PaginationMeta{}, err
 	}
 
-	err = r.db.SqlConn.Select(&conferences, query, queryArgs...)
+	err = tx.Select(&conferences, query, queryArgs...)
 	if err != nil {
 		return nil, filters.PaginationMeta{}, err
 	}
@@ -112,23 +95,25 @@ func (r *conferenceRepository) GetConferences(p filters.Page, s *filters.Sort, f
 	return conferences, paginationMeta, nil
 }
 
-func (r *conferenceRepository) CreateConference(conference Conference, organizerId string) (Conference, error) {
-	query := "INSERT INTO " + conference.TableName() + " (title, date, location, additional_info, participants_limit, registration_deadline) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id"
-	err := r.db.SqlConn.QueryRow(
+func CreateConference(tx *sqlx.Tx, conference Conference, organizerId string) (Conference, error) {
+	query := "INSERT INTO " + conference.TableName() + " (title, start_date, end_date, location, website, acronym, additional_info, participants_limit, registration_deadline) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id"
+	err := tx.Get(&conference.Id,
 		query,
 		conference.Title,
-		conference.Date,
+		conference.StartDate,
+		conference.EndDate,
 		conference.Location,
+		conference.Website,
+		conference.Acronym,
 		conference.AdditionalInfo,
 		conference.ParticipantsLimit,
 		conference.RegistrationDeadline,
-	).Scan(&conference.Id)
+	)
 	if err != nil {
 		return Conference{}, err
 	}
 
-	conferenceOrganizerRepo := NewConferenceOrganizerRepository(r.ctx, r.db)
-	_, err = conferenceOrganizerRepo.AddOrganizer(conference.Id, organizerId)
+	_, err = AddConferenceOrganizer(tx, conference.Id, organizerId)
 	if err != nil {
 		log.Println("Error adding organizer: ", err)
 		return Conference{}, errors.New("could not add organizer")
@@ -136,19 +121,23 @@ func (r *conferenceRepository) CreateConference(conference Conference, organizer
 	return conference, nil
 }
 
-func (r *conferenceRepository) UpdateConference(conference Conference) (Conference, error) {
-	query := "UPDATE " + conference.TableName() + " SET title = $1, date = $2, location = $3, additional_info = $4, participants_limit = $5, registration_deadline = $6 WHERE id = $7"
-	_, err := r.db.SqlConn.Exec(
+func UpdateConference(tx *sqlx.Tx, conference Conference) (Conference, error) {
+	query := "UPDATE " + conference.TableName() + " SET title = $1, start_date = $2, end_date = $3, location = $4, website = $5, acronym = $6, additional_info = $7, participants_limit = $8, registration_deadline = $9 WHERE id = $10"
+	_, err := tx.Exec(
 		query,
 		conference.Title,
-		conference.Date,
+		conference.StartDate,
+		conference.EndDate,
 		conference.Location,
+		conference.Website,
+		conference.Acronym,
 		conference.AdditionalInfo,
 		conference.ParticipantsLimit,
 		conference.RegistrationDeadline,
 		conference.Id,
 	)
 	if err != nil {
+		log.Println("Error updating conference: ", err)
 		return Conference{}, err
 	}
 	return conference, nil

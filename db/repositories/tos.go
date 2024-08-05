@@ -1,10 +1,6 @@
 package repositories
 
-import (
-	"context"
-
-	"github.com/maciejas22/conference-manager/api/db"
-)
+import "github.com/jmoiron/sqlx"
 
 type TermsOfService struct {
 	Id              string `json:"id" db:"id"`
@@ -17,27 +13,11 @@ func (t *TermsOfService) TableName() string {
 	return "public.terms_of_service"
 }
 
-type TermsOfServiceRepository interface {
-	GetTermsOfService() (TermsOfService, error)
-}
-
-type termsOfServiceRepository struct {
-	ctx context.Context
-	db  *db.DB
-}
-
-func NewTermsOfServiceRepository(ctx context.Context, db *db.DB) TermsOfServiceRepository {
-	return &termsOfServiceRepository{
-		ctx: ctx,
-		db:  db,
-	}
-}
-
-func (r *termsOfServiceRepository) GetTermsOfService() (TermsOfService, error) {
+func GetTermsOfService(tx *sqlx.Tx) (TermsOfService, error) {
 	var term TermsOfService
 	query := "SELECT id, updated_at, introduction, acknowledgement FROM " + term.TableName() + " LIMIT 1"
 
-	err := r.db.SqlConn.Get(
+	err := tx.Get(
 		&term,
 		query,
 	)

@@ -1,12 +1,11 @@
 package repositories
 
 import (
-	"context"
 	"errors"
 	"log"
 	"time"
 
-	"github.com/maciejas22/conference-manager/api/db"
+	"github.com/jmoiron/sqlx"
 )
 
 type News struct {
@@ -20,27 +19,11 @@ func (n *News) TableName() string {
 	return "public.news"
 }
 
-type NewsRepository interface {
-	GetAll() ([]News, error)
-}
-
-type newsRepository struct {
-	ctx context.Context
-	db  *db.DB
-}
-
-func NewNewsRepository(ctx context.Context, db *db.DB) NewsRepository {
-	return &newsRepository{
-		ctx: ctx,
-		db:  db,
-	}
-}
-
-func (r *newsRepository) GetAll() ([]News, error) {
+func GetAllNews(tx *sqlx.Tx) ([]News, error) {
 	var news []News
 	n := &News{}
 	query := "SELECT id, title, content, created_at FROM " + n.TableName() + " ORDER BY created_at DESC"
-	err := r.db.SqlConn.Select(
+	err := tx.Select(
 		&news,
 		query,
 	)

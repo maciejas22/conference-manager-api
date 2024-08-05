@@ -1,9 +1,7 @@
 package repositories
 
 import (
-	"context"
-
-	"github.com/maciejas22/conference-manager/api/db"
+	"github.com/jmoiron/sqlx"
 )
 
 type ConferenceOrganizer struct {
@@ -15,29 +13,11 @@ func (c *ConferenceOrganizer) TableName() string {
 	return "public.conference_organizers"
 }
 
-type ConferenceOrganizerRepository interface {
-	GetOrganizers(conferenceId string) ([]ConferenceOrganizer, error)
-	IsOrganizer(conferenceId string, userId string) (bool, error)
-	AddOrganizer(conferenceId string, userId string) (Conference, error)
-}
-
-type conferenceOrganizerRepository struct {
-	ctx context.Context
-	db  *db.DB
-}
-
-func NewConferenceOrganizerRepository(ctx context.Context, db *db.DB) ConferenceOrganizerRepository {
-	return &conferenceOrganizerRepository{
-		ctx: ctx,
-		db:  db,
-	}
-}
-
-func (r *conferenceOrganizerRepository) GetOrganizers(conferenceId string) ([]ConferenceOrganizer, error) {
+func GetConferenceOrganizers(tx *sqlx.Tx, conferenceId string) ([]ConferenceOrganizer, error) {
 	var organizers []ConferenceOrganizer
 	o := &ConferenceOrganizer{}
 	query := "SELECT user_id, conference_id FROM " + o.TableName() + " WHERE conference_id = $1"
-	err := r.db.SqlConn.Select(
+	err := tx.Select(
 		&organizers,
 		query,
 		conferenceId,
@@ -48,11 +28,11 @@ func (r *conferenceOrganizerRepository) GetOrganizers(conferenceId string) ([]Co
 	return organizers, nil
 }
 
-func (r *conferenceOrganizerRepository) IsOrganizer(conferenceId string, userId string) (bool, error) {
+func IsConferenceOrganizer(tx *sqlx.Tx, conferenceId string, userId string) (bool, error) {
 	var count int
 	o := &ConferenceOrganizer{}
 	query := "SELECT COUNT(*) FROM " + o.TableName() + " WHERE conference_id = $1 AND user_id = $2"
-	err := r.db.SqlConn.Get(
+	err := tx.Get(
 		&count,
 		query,
 		conferenceId,
@@ -64,13 +44,13 @@ func (r *conferenceOrganizerRepository) IsOrganizer(conferenceId string, userId 
 	return count > 0, nil
 }
 
-func (r *conferenceOrganizerRepository) AddOrganizer(conferenceId string, userId string) (Conference, error) {
+func AddConferenceOrganizer(tx *sqlx.Tx, conferenceId string, userId string) (Conference, error) {
 	o := &ConferenceOrganizer{
 		UserId:       userId,
 		ConferenceId: conferenceId,
 	}
 	query := "INSERT INTO " + o.TableName() + " (user_id, conference_id) VALUES ($1, $2)"
-	_, err := r.db.SqlConn.Exec(
+	_, err := tx.Exec(
 		query,
 		o.UserId,
 		o.ConferenceId,

@@ -1,10 +1,6 @@
 package repositories
 
-import (
-	"context"
-
-	"github.com/maciejas22/conference-manager/api/db"
-)
+import "github.com/jmoiron/sqlx"
 
 type Section struct {
 	Id               string  `json:"id" db:"id"`
@@ -17,27 +13,11 @@ func (s *Section) TableName() string {
 	return "public.sections"
 }
 
-type SectionRepository interface {
-	GetSections(termsOfServiceId string) ([]Section, error)
-}
-
-type sectionRepository struct {
-	ctx context.Context
-	db  *db.DB
-}
-
-func NewSectionRepository(ctx context.Context, db *db.DB) SectionRepository {
-	return &sectionRepository{
-		ctx: ctx,
-		db:  db,
-	}
-}
-
-func (r *sectionRepository) GetSections(termsOfServiceId string) ([]Section, error) {
+func GetToSSections(tx *sqlx.Tx, termsOfServiceId string) ([]Section, error) {
 	var sections []Section
 	s := &Section{}
 	query := "SELECT id, terms_of_service_id, title, content FROM " + s.TableName() + " WHERE terms_of_service_id = $1"
-	err := r.db.SqlConn.Select(
+	err := tx.Select(
 		&sections,
 		query,
 		termsOfServiceId,

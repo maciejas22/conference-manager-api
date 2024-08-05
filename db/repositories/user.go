@@ -1,12 +1,11 @@
 package repositories
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"log"
 
-	"github.com/maciejas22/conference-manager/api/db"
+	"github.com/jmoiron/sqlx"
 )
 
 type Role string
@@ -77,33 +76,13 @@ type User struct {
 	Email string `json:"email"`
 }
 
-type UserRepository interface {
-	GetByID(id string) (User, error)
-	Update(
-		id string,
-		username string,
-		email string,
-		name string,
-		surname string,
-	) (User, error)
-}
-
-type userRepo struct {
-	ctx context.Context
-	db  *db.DB
-}
-
-func NewUserRepo(ctx context.Context, db *db.DB) UserRepository {
-	return &userRepo{ctx, db}
-}
-
-func (r *userRepo) GetByID(id string) (User, error) {
+func GetUserByID(tx *sqlx.Tx, id string) (User, error) {
 	var user User
 
 	p := &PublicUser{}
 	a := &AuthUser{}
 	query := "SELECT u.id, u.name, u.surname, u.username, u.role, a.email, a.created_at, a.updated_at FROM " + p.TableName() + " u JOIN " + a.TableName() + " a ON u.id = a.id WHERE u.id = $1"
-	err := r.db.SqlConn.Get(
+	err := tx.Get(
 		&user,
 		query,
 		id,
@@ -116,7 +95,8 @@ func (r *userRepo) GetByID(id string) (User, error) {
 	return user, nil
 }
 
-func (r *userRepo) Update(
+func UpdateUser(
+	tx *sqlx.Tx,
 	id string,
 	username string,
 	email string,
@@ -125,47 +105,22 @@ func (r *userRepo) Update(
 ) (User, error) {
 	var user User
 
-	tx, err := r.db.SqlConn.Beginx()
-	if err != nil {
-		log.Println(err.Error())
-		return User{}, errors.New("could not begin transaction")
-	}
-
 	p := &PublicUser{}
 	a := &AuthUser{}
+
 	query := "UPDATE " + p.TableName() + " SET name = $1, surname = $2, username = $3 WHERE id = $4"
-	_, err = tx.Exec(
-		query,
-		name,
-		surname,
-		username,
-		id,
-	)
+	_, err := tx.Exec(query, name, surname, username, id)
 	if err != nil {
-		tx.Rollback()
-		log.Println(err.Error())
-		return User{}, errors.New("could not update user")
+		return User{}, err
 	}
 
 	query = "UPDATE " + a.TableName() + " SET email = $1 WHERE id = $2"
-	_, err = tx.Exec(
-		query,
-		email,
-		id,
-	)
+	_, err = tx.Exec(query, email, id)
 	if err != nil {
-		tx.Rollback()
-		log.Println(err.Error())
-		return User{}, errors.New("could not update email")
+		return User{}, errors.New("could not update user")
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		log.Println("Error committing transaction " + err.Error())
-		return User{}, errors.New("could not commit transaction")
-	}
-
-	user, err = r.GetByID(id)
+	user, err = GetUserByID(tx, id)
 	if err != nil {
 		return User{}, errors.New("user not found")
 	}
