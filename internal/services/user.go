@@ -5,7 +5,7 @@ import (
 
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
-	"github.com/maciejas22/conference-manager/api/internal/converter"
+	"github.com/maciejas22/conference-manager/api/internal/converters"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 )
 
@@ -24,7 +24,7 @@ func UpdateUser(ctx context.Context, db *db.DB, userId string, updateUserInput m
 		return nil, err
 	}
 
-	return converter.ConvertUserRepoToSchema(&user), nil
+	return converters.ConvertUserRepoToSchema(&user), nil
 }
 
 func GetUserData(ctx context.Context, db *db.DB, userId string) (*models.User, error) {
@@ -42,5 +42,5 @@ func GetUserData(ctx context.Context, db *db.DB, userId string) (*models.User, e
 		return nil, err
 	}
 
-	return converter.ConvertUserRepoToSchema(&user), nil
+	return converters.ConvertUserRepoToSchema(&user), nil
 }

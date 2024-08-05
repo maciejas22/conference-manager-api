@@ -5,7 +5,7 @@ import (
 
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
-	"github.com/maciejas22/conference-manager/api/internal/converter"
+	"github.com/maciejas22/conference-manager/api/internal/converters"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 )
 
@@ -43,7 +43,7 @@ func AddUserToConference(ctx context.Context, db *db.DB, userId string, conferen
 		return nil, err
 	}
 
-	return converter.ConvertConferenceRepoToSchema(&conference), nil
+	return converters.ConvertConferenceRepoToSchema(&conference), nil
 }
 
 func RemoveUserFromConference(ctx context.Context, db *db.DB, userId string, conferenceID string) (*models.Conference, error) {
@@ -62,7 +62,7 @@ func RemoveUserFromConference(ctx context.Context, db *db.DB, userId string, con
 		return nil, err
 	}
 
-	return converter.ConvertConferenceRepoToSchema(&conference), nil
+	return converters.ConvertConferenceRepoToSchema(&conference), nil
 }
 
 func IsConferenceParticipant(ctx context.Context, db *db.DB, userId, conferenceID string) (*bool, error) {

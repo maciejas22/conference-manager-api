@@ -1,4 +1,4 @@
-package converter
+package converters
 
 import (
 	"github.com/maciejas22/conference-manager/api/db/repositories"

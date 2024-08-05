@@ -1,12 +1,12 @@
-package converter
+package converters
 
 import (
 	"github.com/maciejas22/conference-manager/api/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 )
 
-func ConvertSectionRepoToSchema(s *repositories.Section) *models.Section {
-	return &models.Section{
+func ConvertSubsectionRepoToSchema(s *repositories.Subsection) *models.SubSection {
+	return &models.SubSection{
 		ID:      s.Id,
 		Title:   &s.Title,
 		Content: s.Content,

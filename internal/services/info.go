@@ -5,7 +5,7 @@ import (
 
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
-	"github.com/maciejas22/conference-manager/api/internal/converter"
+	"github.com/maciejas22/conference-manager/api/internal/converters"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 )
 
@@ -26,7 +26,7 @@ func GetNews(ctx context.Context, db *db.DB) ([]*models.News, error) {
 
 	var result []*models.News
 	for _, n := range news {
-		result = append(result, converter.ConvertNewsRepoToSchema(&n))
+		result = append(result, converters.ConvertNewsRepoToSchema(&n))
 	}
 
 	return result, nil
@@ -47,7 +47,7 @@ func GetTermsAndConditions(ctx context.Context, db *db.DB) (*models.TermsOfServi
 		return nil, err
 	}
 
-	return converter.ConvertTosRepoToSchema(&termsOfService), nil
+	return converters.ConvertTosRepoToSchema(&termsOfService), nil
 }
 
 func GetToSSections(ctx context.Context, db *db.DB, tosId string) ([]*models.Section, error) {
@@ -66,7 +66,7 @@ func GetToSSections(ctx context.Context, db *db.DB, tosId string) ([]*models.Sec
 
 	var result []*models.Section
 	for _, s := range sections {
-		result = append(result, converter.ConvertSectionRepoToSchema(&s))
+		result = append(result, converters.ConvertSectionRepoToSchema(&s))
 	}
 
 	return result, nil
@@ -89,7 +89,7 @@ func GetToSSubsections(ctx context.Context, db *db.DB, sectionId string) ([]*mod
 
 	var result []*models.SubSection
 	for _, s := range subSections {
-		result = append(result, converter.ConvertSubsectionRepoToSchema(&s))
+		result = append(result, converters.ConvertSubsectionRepoToSchema(&s))
 	}
 
 	return result, nil

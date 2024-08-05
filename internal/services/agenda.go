@@ -5,7 +5,7 @@ import (
 
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
-	"github.com/maciejas22/conference-manager/api/internal/converter"
+	"github.com/maciejas22/conference-manager/api/internal/converters"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 )
 
@@ -26,7 +26,7 @@ func GetConferenceAgenda(ctx context.Context, db *db.DB, conferenceId string) ([
 
 	var agendaItems []*models.AgendaItem
 	for _, a := range agenda {
-		agendaItems = append(agendaItems, converter.ConvertAgendaItemRepoToSchema(&a))
+		agendaItems = append(agendaItems, converters.ConvertAgendaItemRepoToSchema(&a))
 	}
 
 	return agendaItems, nil

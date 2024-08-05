@@ -5,7 +5,7 @@ import (
 
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
-	"github.com/maciejas22/conference-manager/api/internal/converter"
+	"github.com/maciejas22/conference-manager/api/internal/converters"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 	"github.com/maciejas22/conference-manager/api/internal/utils"
 )
@@ -57,7 +57,7 @@ func CreateConference(ctx context.Context, db *db.DB, userId string, createConfe
 		return nil, err
 	}
 
-	return converter.ConvertConferenceRepoToSchema(&conference), nil
+	return converters.ConvertConferenceRepoToSchema(&conference), nil
 }
 
 func ModifyConference(ctx context.Context, db *db.DB, input models.ModifyConferenceInput) (*models.Conference, error) {
@@ -130,7 +130,7 @@ func ModifyConference(ctx context.Context, db *db.DB, input models.ModifyConfere
 		return nil, err
 	}
 
-	return converter.ConvertConferenceRepoToSchema(&conference), nil
+	return converters.ConvertConferenceRepoToSchema(&conference), nil
 }
 
 func GetAllConferences(ctx context.Context, db *db.DB, page *models.Page, sort *models.Sort, filters *models.ConferenceFilter) (*models.ConferencePage, error) {
@@ -141,9 +141,9 @@ func GetAllConferences(ctx context.Context, db *db.DB, page *models.Page, sort *
 
 	c, m, err := repositories.GetAllConferences(
 		tx,
-		converter.ConvertPageSchemaToRepo(page),
-		converter.ConvertSortSchemaToRepo(sort),
-		converter.ConvertConferenceFiltersSchemaToRepo(filters),
+		converters.ConvertPageSchemaToRepo(page),
+		converters.ConvertSortSchemaToRepo(sort),
+		converters.ConvertConferenceFiltersSchemaToRepo(filters),
 	)
 	if err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func GetAllConferences(ctx context.Context, db *db.DB, page *models.Page, sort *
 
 	var conferences []*models.Conference
 	for _, conference := range c {
-		conferences = append(conferences, converter.ConvertConferenceRepoToSchema(&conference))
+		conferences = append(conferences, converters.ConvertConferenceRepoToSchema(&conference))
 	}
 
 	return &models.ConferencePage{
@@ -186,5 +186,5 @@ func GetConference(ctx context.Context, db *db.DB, id string) (*models.Conferenc
 		return nil, err
 	}
 
-	return converter.ConvertConferenceRepoToSchema(&conference), nil
+	return converters.ConvertConferenceRepoToSchema(&conference), nil
 }
