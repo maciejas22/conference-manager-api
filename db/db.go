@@ -84,29 +84,6 @@ func GetDriverConfig(l *slog.Logger) *pgx.ConnConfig {
 	return connConfig
 }
 
-func SqlConnect(c context.Context, l *slog.Logger) (*sqlx.DB, error) {
-	connConfig, _ := pgx.ParseConfig(config.AppConfig.DatabaseURL)
-	adapterLogger := NewLogger(l)
-	m := MultiQueryTracer{
-		Tracers: []pgx.QueryTracer{
-			&tracelog.TraceLog{
-				Logger:   adapterLogger,
-				LogLevel: tracelog.LogLevelTrace,
-			},
-		},
-	}
-
-	connConfig.Tracer = &m
-
-	connStr := stdlib.RegisterConnConfig(connConfig)
-	conn, err := sqlx.Connect("pgx", connStr)
-	if err != nil {
-		return nil, err
-	}
-
-	return conn, nil
-}
-
 func Connect(ctx context.Context, logger *slog.Logger) (*DB, error) {
 	dc := GetDriverConfig(logger)
 	connStr := stdlib.RegisterConnConfig(dc)

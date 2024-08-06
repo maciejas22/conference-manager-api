@@ -32,7 +32,7 @@ func main() {
 	r.Use(cors.New(cors.Options{
 		AllowedMethods:   []string{"GET", "POST"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
-		AllowedOrigins:   []string{"http://localhost:3000"},
+		AllowedOrigins:   config.AppConfig.CorsAllowedOrigins,
 		AllowCredentials: true,
 		Debug:            true,
 	}).Handler)
@@ -56,10 +56,12 @@ func main() {
 	c.Directives.HasRole = directives.HasRole
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(c))
 
-	r.Handle("/graphiql", playground.Handler("GraphQL playground", "/graphql"))
-	r.Handle("/graphql", srv)
-
 	port := config.AppConfig.Port
-	log.Printf("connect to http://localhost:%d/ for GraphQL playground", port)
+	r.Handle("/graphql", srv)
+	if config.AppConfig.GoEnv == "dev" {
+		r.Handle("/playground", playground.Handler("GraphQL playground", "/graphql"))
+		log.Printf("connect to http://localhost:%d/ for GraphQL playground", port)
+	}
+
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(port), r))
 }

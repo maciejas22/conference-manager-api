@@ -1,6 +1,11 @@
 .idea
 .vscode
 
+.DS_Store
+
 tmp
+
 .env
+.env.prod
+.env.dev
 
