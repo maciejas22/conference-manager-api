@@ -18,4 +18,4 @@ WORKDIR /usr/src/app
 RUN apt-get update && apt-get install -y ca-certificates
 COPY --from=builder /usr/src/app /usr/src/app
 
-CMD ["./bin/conference-manager-api"]
+CMD ["GO_ENV=prod", "./bin/conference-manager-api"]
