@@ -15,8 +15,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Create .env files
-        run: echo "${{ secrets.ENV_FILE }}" > .env
-        run: echo "${{ secrets.ENV_PROD_FILE }}" > .env.prod
+        run: |
+          echo "${{ secrets.ENV_FILE }}" > .env
+          echo "${{ secrets.ENV_PROD_FILE }}" > .env.prod
 
       - name: Setup flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
