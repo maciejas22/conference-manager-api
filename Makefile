@@ -1,6 +1,6 @@
-include .env
-include .env.prod
-include .env.dev
+- include .env
+- include .env.prod
+- include .env.dev
 
 MIGRATIONS_PATH = db/migrations
 
