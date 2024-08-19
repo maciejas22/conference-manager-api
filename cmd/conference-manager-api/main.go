@@ -34,7 +34,7 @@ func main() {
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowedOrigins:   config.AppConfig.CorsAllowedOrigins,
 		AllowCredentials: true,
-		Debug:            true,
+		Debug:            config.AppConfig.GoEnv == "dev",
 	}).Handler)
 
 	db, err := db.Connect(ctx, logger)
@@ -60,7 +60,7 @@ func main() {
 	r.Handle("/graphql", srv)
 	if config.AppConfig.GoEnv == "dev" {
 		r.Handle("/playground", playground.Handler("GraphQL playground", "/graphql"))
-		log.Printf("connect to http://localhost:%d/ for GraphQL playground", port)
+		log.Printf("connect to http://localhost:%d/playground for GraphQL playground", port)
 	}
 
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(port), r))

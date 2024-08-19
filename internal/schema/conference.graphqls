@@ -90,24 +90,32 @@ input ModifyConferenceInput {
   files: [ModifyConferenceInputFile!]
 }
 
+type ConferencesMetrics {
+  runningConferences: Int!
+  startingInLessThan24Hours: Int!
+  totalConducted: Int!
+  participantsToday: Int!
+}
+
 extend type Query {
   conferences(
     page: Page
     sort: Sort
     filters: ConferenceFilter
   ): ConferencePage @authenticated
+  conferencesMetrics: ConferencesMetrics @authenticated
   conference(id: ID!): Conference @authenticated
   isParticipant(conferenceId: ID!): Boolean @hasRole(role: Participant)
   isOrganizer(conferenceId: ID!): Boolean @hasRole(role: Organizer)
 }
 
 extend type Mutation {
-  createConference(createConferenceInput: CreateConferenceInput!): Conference
+  createConference(createConferenceInput: CreateConferenceInput!): Conference!
     @hasRole(role: Organizer)
-  modifyConference(input: ModifyConferenceInput!): Conference
+  modifyConference(input: ModifyConferenceInput!): Conference!
     @hasRole(role: Organizer)
-  addUserToConference(conferenceId: String!): Conference
+  addUserToConference(conferenceId: String!): Conference!
     @hasRole(role: Participant)
-  removeUserFromConference(conferenceId: String!): Conference
+  removeUserFromConference(conferenceId: String!): Conference!
     @hasRole(role: Participant)
 }

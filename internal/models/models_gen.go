@@ -20,6 +20,13 @@ type ConferencePage struct {
 	Meta *ConferenceMeta `json:"meta"`
 }
 
+type ConferencesMetrics struct {
+	RunningConferences        int `json:"runningConferences"`
+	StartingInLessThan24Hours int `json:"startingInLessThan24Hours"`
+	TotalConducted            int `json:"totalConducted"`
+	ParticipantsToday         int `json:"participantsToday"`
+}
+
 type CreateAgendaItemInput struct {
 	StartTime time.Time `json:"startTime"`
 	EndTime   time.Time `json:"endTime"`
