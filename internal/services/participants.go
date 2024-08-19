@@ -71,7 +71,7 @@ func IsConferenceParticipant(ctx context.Context, db *db.DB, userId, conferenceI
 		return nil, err
 	}
 
-	isParticipant, err := repositories.IsConferenceOrganizer(tx, userId, conferenceID)
+	isParticipant, err := repositories.IsConferenceOrganizer(tx, conferenceID, userId)
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	filters "github.com/maciejas22/conference-manager/api/db/repositories/shared"
@@ -141,4 +142,42 @@ func UpdateConference(tx *sqlx.Tx, conference Conference) (Conference, error) {
 		return Conference{}, err
 	}
 	return conference, nil
+}
+
+type ConferencesMetrics struct {
+	RunningConferences        int `json:"runningConferences"`
+	StartingInLessThan24Hours int `json:"startingInLessThan24Hours"`
+	TotalConducted            int `json:"totalConducted"`
+	ParticipantsToday         int `json:"participantsToday"`
+}
+
+func GetMetrics(tx *sqlx.Tx) (ConferencesMetrics, error) {
+	var conference Conference
+	var metrics ConferencesMetrics
+
+	now := time.Now()
+	tomorrow := now.Add(24 * time.Hour)
+
+	err := tx.Get(&metrics.RunningConferences, "SELECT COUNT(*) FROM "+conference.TableName()+" WHERE start_date <= $1 AND end_date >= $1", now)
+	if err != nil {
+		return ConferencesMetrics{}, err
+	}
+
+	err = tx.Get(&metrics.StartingInLessThan24Hours, "SELECT COUNT(*) FROM "+conference.TableName()+" WHERE start_date >= $1 AND start_date <= $2", now, tomorrow)
+	if err != nil {
+		return ConferencesMetrics{}, err
+	}
+
+	err = tx.Get(&metrics.TotalConducted, "SELECT COUNT(*) FROM "+conference.TableName())
+	if err != nil {
+		return ConferencesMetrics{}, err
+	}
+
+	var conferenceParticipant ConferenceParticipant
+	err = tx.Get(&metrics.ParticipantsToday, "SELECT COUNT(DISTINCT user_id) FROM "+conferenceParticipant.TableName()+" cp JOIN "+conference.TableName()+" c ON cp.conference_id = c.id WHERE c.start_date <= $1 AND c.end_date >= $1", now)
+	if err != nil {
+		return ConferencesMetrics{}, err
+	}
+
+	return metrics, nil
 }

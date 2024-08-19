@@ -13,7 +13,7 @@ type User {
 }
 
 extend type Query {
-  user: User
+  user: User @authenticated
 }
 
 input UpdateUserInput {

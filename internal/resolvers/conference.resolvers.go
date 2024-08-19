@@ -47,6 +47,10 @@ func (r *queryResolver) Conferences(ctx context.Context, page *models.Page, sort
 	return services.GetAllConferences(ctx, r.dbClient, page, sort, filters)
 }
 
+func (r *queryResolver) ConferencesMetrics(ctx context.Context) (*models.ConferencesMetrics, error) {
+	return services.GetConferencesMetrics(ctx, r.dbClient)
+}
+
 func (r *queryResolver) Conference(ctx context.Context, id string) (*models.Conference, error) {
 	conferenceData, err := services.GetConference(ctx, r.dbClient, id)
 	if err != nil {

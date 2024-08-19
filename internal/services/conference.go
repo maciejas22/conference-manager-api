@@ -188,3 +188,26 @@ func GetConference(ctx context.Context, db *db.DB, id string) (*models.Conferenc
 
 	return converters.ConvertConferenceRepoToSchema(&conference), nil
 }
+
+func GetConferencesMetrics(ctx context.Context, db *db.DB) (*models.ConferencesMetrics, error) {
+	tx, err := db.Conn.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	metrics, err := repositories.GetMetrics(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &models.ConferencesMetrics{
+		RunningConferences:        metrics.RunningConferences,
+		StartingInLessThan24Hours: metrics.StartingInLessThan24Hours,
+		TotalConducted:            metrics.TotalConducted,
+		ParticipantsToday:         metrics.ParticipantsToday,
+	}, nil
+}
