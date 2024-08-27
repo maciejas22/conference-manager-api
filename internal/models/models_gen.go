@@ -11,6 +11,11 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 )
 
+type ChartTrend struct {
+	Date  time.Time `json:"date"`
+	Count int       `json:"count"`
+}
+
 type ConferenceMeta struct {
 	Page *PageInfo `json:"page"`
 }
@@ -88,6 +93,18 @@ type ModifyConferenceInputFile struct {
 type Mutation struct {
 }
 
+type OrganizerMetrics struct {
+	RunningConferences        int     `json:"runningConferences"`
+	ParticipantsCount         int     `json:"participantsCount"`
+	AverageParticipantsCount  float64 `json:"averageParticipantsCount"`
+	TotalOrganizedConferences int     `json:"totalOrganizedConferences"`
+}
+
+type ParticipantsJoiningTrend struct {
+	Trend       []*ChartTrend `json:"trend"`
+	Granularity Granularity   `json:"granularity"`
+}
+
 type Query struct {
 }
 
@@ -100,6 +117,49 @@ type UpdateUserInput struct {
 
 type UploadFile struct {
 	File *graphql.Upload `json:"file,omitempty"`
+}
+
+type Granularity string
+
+const (
+	GranularityDaily   Granularity = "Daily"
+	GranularityWeekly  Granularity = "Weekly"
+	GranularityMonthly Granularity = "Monthly"
+)
+
+var AllGranularity = []Granularity{
+	GranularityDaily,
+	GranularityWeekly,
+	GranularityMonthly,
+}
+
+func (e Granularity) IsValid() bool {
+	switch e {
+	case GranularityDaily, GranularityWeekly, GranularityMonthly:
+		return true
+	}
+	return false
+}
+
+func (e Granularity) String() string {
+	return string(e)
+}
+
+func (e *Granularity) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = Granularity(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid Granularity", str)
+	}
+	return nil
+}
+
+func (e Granularity) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type Order string

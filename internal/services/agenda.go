@@ -31,3 +31,21 @@ func GetConferenceAgenda(ctx context.Context, db *db.DB, conferenceId string) ([
 
 	return agendaItems, nil
 }
+
+func GetAgendaItemsCount(ctx context.Context, db *db.DB, conferenceId string) (int, error) {
+	tx, err := db.Conn.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	agendaItemsCount, err := repositories.CountAgendaItems(tx, conferenceId)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+
+	return agendaItemsCount, nil
+}

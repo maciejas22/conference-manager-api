@@ -46,7 +46,7 @@ func GetConference(tx *sqlx.Tx, conferenceId string) (Conference, error) {
 	return conference, nil
 }
 
-func GetAllConferences(tx *sqlx.Tx, p filters.Page, s *filters.Sort, f *ConferenceFilter) ([]Conference, filters.PaginationMeta, error) {
+func GetAllConferences(tx *sqlx.Tx, userId string, p filters.Page, s *filters.Sort, f *ConferenceFilter) ([]Conference, filters.PaginationMeta, error) {
 	var conferences []Conference
 	var totalItems int
 	c := &Conference{}
@@ -62,6 +62,13 @@ func GetAllConferences(tx *sqlx.Tx, p filters.Page, s *filters.Sort, f *Conferen
 		whereClause += fmt.Sprintf(" AND title LIKE $%d", argCounter)
 		queryArgs = append(queryArgs, "%"+*f.Title+"%")
 		argCounter++
+	}
+
+	if f.AssociatedOnly != nil && *f.AssociatedOnly {
+		whereClause += fmt.Sprintf(" AND id IN (SELECT conference_id FROM %s WHERE user_id = $%d UNION SELECT conference_id FROM %s WHERE user_id = $%d)",
+			(new(ConferenceParticipant)).TableName(), argCounter, (new(ConferenceOrganizer)).TableName(), argCounter+1)
+		queryArgs = append(queryArgs, userId, userId)
+		argCounter += 2
 	}
 
 	query += whereClause

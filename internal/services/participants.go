@@ -71,7 +71,7 @@ func IsConferenceParticipant(ctx context.Context, db *db.DB, userId, conferenceI
 		return nil, err
 	}
 
-	isParticipant, err := repositories.IsConferenceOrganizer(tx, conferenceID, userId)
+	isParticipant, err := repositories.IsConferenceParticipant(tx, conferenceID, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,6 @@ func IsConferenceParticipant(ctx context.Context, db *db.DB, userId, conferenceI
 }
 
 func IsConferenceOrganizer(ctx context.Context, db *db.DB, userId string, conferenceID string) (*bool, error) {
-
 	tx, err := db.Conn.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -99,4 +98,52 @@ func IsConferenceOrganizer(ctx context.Context, db *db.DB, userId string, confer
 		return nil, err
 	}
 	return &isOrganizer, nil
+}
+
+func GetOrganizerMetrics(ctx context.Context, db *db.DB, organizerId string) (*models.OrganizerMetrics, error) {
+	tx, err := db.Conn.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	organizerMetrics, err := repositories.GetOrganizerLevelMetrics(tx, organizerId)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &models.OrganizerMetrics{
+		RunningConferences:        organizerMetrics.RunningConferencesCount,
+		ParticipantsCount:         organizerMetrics.ParticipantsCount,
+		AverageParticipantsCount:  organizerMetrics.AverageParticipantsCount,
+		TotalOrganizedConferences: organizerMetrics.TotalOrganizedConferences,
+	}, nil
+}
+
+func GetParticipantsJoiningTrend(ctx context.Context, db *db.DB, organizerId string) (*models.ParticipantsJoiningTrend, error) {
+	tx, err := db.Conn.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	participantsJoiningTrend, err := repositories.GetParticipantsTrend(tx, organizerId)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	var trendEntries []*models.ChartTrend
+	for _, trendEntry := range participantsJoiningTrend.Trend {
+		trendEntries = append(trendEntries, converters.ConvertTrendEntryRepoToSchema(&trendEntry))
+	}
+	return &models.ParticipantsJoiningTrend{
+		Trend:       trendEntries,
+		Granularity: models.Granularity(participantsJoiningTrend.Granularity),
+	}, nil
 }

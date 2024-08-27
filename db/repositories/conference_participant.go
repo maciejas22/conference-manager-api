@@ -10,6 +10,7 @@ import (
 type ConferenceParticipant struct {
 	UserId       string `json:"user_id" db:"user_id"`
 	ConferenceId string `json:"conference_id" db:"conference_id"`
+	JoinedAt     string `json:"joined_at" db:"joined_at"`
 }
 
 func (c *ConferenceParticipant) TableName() string {

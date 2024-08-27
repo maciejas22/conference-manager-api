@@ -17,6 +17,7 @@ type Conference {
   participantsLimit: Int
   registrationDeadline: Time
   files: [File!]!
+  eventsCount: Int!
 }
 
 type ConferencePage {
@@ -97,12 +98,37 @@ type ConferencesMetrics {
   participantsToday: Int!
 }
 
+type OrganizerMetrics {
+  runningConferences: Int!
+  participantsCount: Int!
+  averageParticipantsCount: Float!
+  totalOrganizedConferences: Int!
+}
+
+enum Granularity {
+  Daily
+  Weekly
+  Monthly
+}
+
+type ChartTrend {
+  date: Time!
+  count: Int!
+}
+
+type ParticipantsJoiningTrend {
+  trend: [ChartTrend!]!
+  granularity: Granularity!
+}
+
 extend type Query {
   conferences(
     page: Page
     sort: Sort
     filters: ConferenceFilter
   ): ConferencePage @authenticated
+  organizerMetrics: OrganizerMetrics @authenticated
+  participantsJoiningTrend: ParticipantsJoiningTrend @hasRole(role: Organizer)
   conferencesMetrics: ConferencesMetrics @authenticated
   conference(id: ID!): Conference @authenticated
   isParticipant(conferenceId: ID!): Boolean @hasRole(role: Participant)

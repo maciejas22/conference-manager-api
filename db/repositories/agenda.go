@@ -70,3 +70,14 @@ func DeleteAgenda(tx *sqlx.Tx, agendaId string) error {
 
 	return nil
 }
+
+func CountAgendaItems(tx *sqlx.Tx, conferenceId string) (int, error) {
+	var count int
+	query := "SELECT COUNT(*) FROM " + new(AgendaItem).TableName() + " WHERE conference_id = $1"
+	err := tx.Get(&count, query, conferenceId)
+	if err != nil {
+		log.Panicln("Error while counting agenda items: ", err)
+		return 0, err
+	}
+	return count, nil
+}

@@ -6,6 +6,7 @@ package resolvers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/maciejas22/conference-manager/api/internal/auth"
 	"github.com/maciejas22/conference-manager/api/internal/graph"
@@ -20,6 +21,10 @@ func (r *conferenceResolver) Agenda(ctx context.Context, obj *models.Conference)
 
 func (r *conferenceResolver) ParticipantsCount(ctx context.Context, obj *models.Conference) (int, error) {
 	return services.GetParticipantsCount(ctx, r.dbClient, obj.ID)
+}
+
+func (r *conferenceResolver) EventsCount(ctx context.Context, obj *models.Conference) (int, error) {
+	return services.GetAgendaItemsCount(ctx, r.dbClient, obj.ID)
 }
 
 func (r *mutationResolver) CreateConference(ctx context.Context, createConferenceInput models.CreateConferenceInput) (*models.Conference, error) {
@@ -44,7 +49,20 @@ func (r *mutationResolver) RemoveUserFromConference(ctx context.Context, confere
 }
 
 func (r *queryResolver) Conferences(ctx context.Context, page *models.Page, sort *models.Sort, filters *models.ConferenceFilter) (*models.ConferencePage, error) {
-	return services.GetAllConferences(ctx, r.dbClient, page, sort, filters)
+	c, _ := auth.FromContext(ctx)
+	return services.GetAllConferences(ctx, r.dbClient, c.Subject, page, sort, filters)
+}
+
+func (r *queryResolver) OrganizerMetrics(ctx context.Context) (*models.OrganizerMetrics, error) {
+	c, _ := auth.FromContext(ctx)
+	return services.GetOrganizerMetrics(ctx, r.dbClient, c.Subject)
+}
+
+func (r *queryResolver) ParticipantsJoiningTrend(ctx context.Context) (*models.ParticipantsJoiningTrend, error) {
+	c, _ := auth.FromContext(ctx)
+	x, e := services.GetParticipantsJoiningTrend(ctx, r.dbClient, c.Subject)
+	fmt.Println(*x.Trend[0])
+	return x, e
 }
 
 func (r *queryResolver) ConferencesMetrics(ctx context.Context) (*models.ConferencesMetrics, error) {

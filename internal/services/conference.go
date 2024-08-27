@@ -11,7 +11,6 @@ import (
 )
 
 func CreateConference(ctx context.Context, db *db.DB, userId string, createConferenceInput models.CreateConferenceInput) (*models.Conference, error) {
-
 	tx, err := db.Conn.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -133,7 +132,7 @@ func ModifyConference(ctx context.Context, db *db.DB, input models.ModifyConfere
 	return converters.ConvertConferenceRepoToSchema(&conference), nil
 }
 
-func GetAllConferences(ctx context.Context, db *db.DB, page *models.Page, sort *models.Sort, filters *models.ConferenceFilter) (*models.ConferencePage, error) {
+func GetAllConferences(ctx context.Context, db *db.DB, userId string, page *models.Page, sort *models.Sort, filters *models.ConferenceFilter) (*models.ConferencePage, error) {
 	tx, err := db.Conn.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -141,6 +140,7 @@ func GetAllConferences(ctx context.Context, db *db.DB, page *models.Page, sort *
 
 	c, m, err := repositories.GetAllConferences(
 		tx,
+		userId,
 		converters.ConvertPageSchemaToRepo(page),
 		converters.ConvertSortSchemaToRepo(sort),
 		converters.ConvertConferenceFiltersSchemaToRepo(filters),
