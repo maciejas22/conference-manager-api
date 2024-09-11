@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/maciejas22/conference-manager/api/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/auth"
 	"github.com/maciejas22/conference-manager/api/internal/graph"
 	"github.com/maciejas22/conference-manager/api/internal/models"
@@ -29,11 +30,11 @@ func (r *conferenceResolver) EventsCount(ctx context.Context, obj *models.Confer
 
 func (r *mutationResolver) CreateConference(ctx context.Context, createConferenceInput models.CreateConferenceInput) (*models.Conference, error) {
 	c, _ := auth.FromContext(ctx)
-	return services.CreateConference(ctx, r.dbClient, c.Subject, createConferenceInput)
+	return services.CreateConference(ctx, r.dbClient, r.s3Client, c.Subject, createConferenceInput)
 }
 
 func (r *mutationResolver) ModifyConference(ctx context.Context, input models.ModifyConferenceInput) (*models.Conference, error) {
-	return services.ModifyConference(ctx, r.dbClient, input)
+	return services.ModifyConference(ctx, r.dbClient, r.s3Client, input)
 }
 
 func (r *mutationResolver) AddUserToConference(ctx context.Context, conferenceID string) (*models.Conference, error) {
@@ -75,7 +76,7 @@ func (r *queryResolver) Conference(ctx context.Context, id string) (*models.Conf
 		return nil, gqlerror.Errorf(err.Error())
 	}
 
-	conferenceFiles, err := services.GetConferenceFiles(ctx, r.s3Client, id)
+	conferenceFiles, err := repositories.GetFiles(ctx, r.s3Client, id)
 	if err != nil {
 		return nil, gqlerror.Errorf(err.Error())
 	}

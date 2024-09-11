@@ -8,9 +8,10 @@ import (
 	"github.com/maciejas22/conference-manager/api/internal/converters"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 	"github.com/maciejas22/conference-manager/api/internal/utils"
+	"github.com/maciejas22/conference-manager/api/pkg/s3"
 )
 
-func CreateConference(ctx context.Context, db *db.DB, userId string, createConferenceInput models.CreateConferenceInput) (*models.Conference, error) {
+func CreateConference(ctx context.Context, db *db.DB, s3 *s3.S3Client, userId string, createConferenceInput models.CreateConferenceInput) (*models.Conference, error) {
 	tx, err := db.Conn.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -52,6 +53,17 @@ func CreateConference(ctx context.Context, db *db.DB, userId string, createConfe
 		}
 	}
 
+	for _, f := range createConferenceInput.Files {
+		file, err := converters.ConvertUploadFileToReader(f.UploadFile)
+		if err != nil {
+			return nil, err
+		}
+		err = repositories.UploadFile(ctx, s3, conference.Id, file.Name, file.Content)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -59,7 +71,7 @@ func CreateConference(ctx context.Context, db *db.DB, userId string, createConfe
 	return converters.ConvertConferenceRepoToSchema(&conference), nil
 }
 
-func ModifyConference(ctx context.Context, db *db.DB, input models.ModifyConferenceInput) (*models.Conference, error) {
+func ModifyConference(ctx context.Context, db *db.DB, s3 *s3.S3Client, input models.ModifyConferenceInput) (*models.Conference, error) {
 	tx, err := db.Conn.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -122,6 +134,24 @@ func ModifyConference(ctx context.Context, db *db.DB, input models.ModifyConfere
 				return nil, err
 			}
 
+		}
+	}
+
+	for _, f := range input.Files {
+		if f.DeleteFile != nil {
+			err = repositories.DeleteFile(ctx, s3, f.DeleteFile.ID)
+			if err != nil {
+				return nil, err
+			}
+		} else if f.UploadFile != nil {
+			file, err := converters.ConvertUploadFileToReader(f.UploadFile)
+			if err != nil {
+				return nil, err
+			}
+			err = repositories.UploadFile(ctx, s3, conference.Id, file.Name, file.Content)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

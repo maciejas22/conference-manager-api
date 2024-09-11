@@ -1,8 +1,8 @@
 package s3
 
 import (
+	"io"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -30,7 +30,7 @@ type File struct {
 	URL  string
 }
 
-func (client *S3Client) UploadFile(bucket string, key string, file *os.File) error {
+func (client *S3Client) UploadFile(bucket string, key string, file io.ReadSeeker) error {
 	_, err := client.s3.PutObject(&s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),

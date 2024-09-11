@@ -7,8 +7,6 @@ import (
 	"io"
 	"strconv"
 	"time"
-
-	"github.com/99designs/gqlgen/graphql"
 )
 
 type ChartTrend struct {
@@ -116,7 +114,8 @@ type UpdateUserInput struct {
 }
 
 type UploadFile struct {
-	File *graphql.Upload `json:"file,omitempty"`
+	FileName      string `json:"fileName"`
+	Base64Content string `json:"base64Content"`
 }
 
 type Granularity string

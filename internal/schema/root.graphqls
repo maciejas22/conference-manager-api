@@ -34,7 +34,8 @@ type File {
 }
 
 input UploadFile {
-  file: Upload
+  fileName: String!
+  base64Content: String!
 }
 
 input DeleteFile {
