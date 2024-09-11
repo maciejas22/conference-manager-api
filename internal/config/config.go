@@ -67,4 +67,5 @@ func LoadConfig() {
 	}
 
 	log.Printf("app is running in %s mode\n", env)
+	log.Printf("cors allowed origins: %v\n", AppConfig.CorsAllowedOrigins)
 }
