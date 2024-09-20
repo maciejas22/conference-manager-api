@@ -9,18 +9,9 @@ import (
 	"github.com/maciejas22/conference-manager/api/internal/models"
 )
 
-func GetNews(ctx context.Context, db *db.DB) ([]*models.News, error) {
-	tx, err := db.Conn.BeginTxx(ctx, nil)
+func GetNews(ctx context.Context, dbClient *db.DB) ([]*models.News, error) {
+	news, err := repositories.GetAllNews(dbClient.QueryExecutor)
 	if err != nil {
-		return nil, err
-	}
-
-	news, err := repositories.GetAllNews(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
@@ -32,35 +23,18 @@ func GetNews(ctx context.Context, db *db.DB) ([]*models.News, error) {
 	return result, nil
 }
 
-func GetTermsAndConditions(ctx context.Context, db *db.DB) (*models.TermsOfService, error) {
-	tx, err := db.Conn.BeginTxx(ctx, nil)
+func GetTermsAndConditions(ctx context.Context, dbClient *db.DB) (*models.TermsOfService, error) {
+	termsOfService, err := repositories.GetTermsOfService(dbClient.QueryExecutor)
 	if err != nil {
-		return nil, err
-	}
-
-	termsOfService, err := repositories.GetTermsOfService(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
 	return converters.ConvertTosRepoToSchema(&termsOfService), nil
 }
 
-func GetToSSections(ctx context.Context, db *db.DB, tosId string) ([]*models.Section, error) {
-	tx, err := db.Conn.BeginTxx(ctx, nil)
+func GetToSSections(ctx context.Context, dbClient *db.DB, tosId int) ([]*models.Section, error) {
+	sections, err := repositories.GetToSSections(dbClient.QueryExecutor, tosId)
 	if err != nil {
-		return nil, err
-	}
-	sections, err := repositories.GetToSSections(tx, tosId)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
@@ -72,18 +46,9 @@ func GetToSSections(ctx context.Context, db *db.DB, tosId string) ([]*models.Sec
 	return result, nil
 }
 
-func GetToSSubsections(ctx context.Context, db *db.DB, sectionId string) ([]*models.SubSection, error) {
-	tx, err := db.Conn.BeginTxx(ctx, nil)
+func GetToSSubsections(ctx context.Context, dbClient *db.DB, sectionId int) ([]*models.SubSection, error) {
+	subSections, err := repositories.GetToSSubsections(dbClient.QueryExecutor, sectionId)
 	if err != nil {
-		return nil, err
-	}
-
-	subSections, err := repositories.GetToSSubsections(tx, sectionId)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 

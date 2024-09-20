@@ -1,27 +1,28 @@
 package repositories
 
 import (
-	"log"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/maciejas22/conference-manager/api/db"
 )
 
 type ConferenceOrganizer struct {
-	UserId       string `json:"user_id" db:"user_id"`
-	ConferenceId string `json:"conference_id" db:"conference_id"`
-	CreatedAt    string `json:"created_at" db:"created_at"`
+	UserId       int    `json:"user_id" db:"user_id"`
+	ConferenceId int    `json:"conference_id" db:"conference_id"`
+	JoinedAt     string `json:"joined_at" db:"joined_at"`
 }
 
 func (c *ConferenceOrganizer) TableName() string {
-	return "public.conference_organizers"
+	return "conference_organizers"
 }
 
-func GetConferenceOrganizers(tx *sqlx.Tx, conferenceId string) ([]ConferenceOrganizer, error) {
+func GetConferenceOrganizers(qe *db.QueryExecutor, conferenceId int) ([]ConferenceOrganizer, error) {
 	var organizers []ConferenceOrganizer
 	o := &ConferenceOrganizer{}
-	query := "SELECT user_id, conference_id FROM " + o.TableName() + " WHERE conference_id = $1"
-	err := tx.Select(
+	query := "SELECT user_id, conference_id FROM " + o.TableName() + " WHERE conference_id = ?"
+	err := sqlx.Select(
+		qe,
 		&organizers,
 		query,
 		conferenceId,
@@ -32,11 +33,12 @@ func GetConferenceOrganizers(tx *sqlx.Tx, conferenceId string) ([]ConferenceOrga
 	return organizers, nil
 }
 
-func IsConferenceOrganizer(tx *sqlx.Tx, conferenceId string, userId string) (bool, error) {
+func IsConferenceOrganizer(qe *db.QueryExecutor, conferenceId int, userId int) (bool, error) {
 	var count int
 	o := &ConferenceOrganizer{}
-	query := "SELECT COUNT(*) FROM " + o.TableName() + " WHERE conference_id = $1 AND user_id = $2"
-	err := tx.Get(
+	query := "SELECT COUNT(*) FROM " + o.TableName() + " WHERE conference_id = ? AND user_id = ?"
+	err := sqlx.Get(
+		qe,
 		&count,
 		query,
 		conferenceId,
@@ -48,13 +50,13 @@ func IsConferenceOrganizer(tx *sqlx.Tx, conferenceId string, userId string) (boo
 	return count > 0, nil
 }
 
-func AddConferenceOrganizer(tx *sqlx.Tx, conferenceId string, userId string) (Conference, error) {
+func AddConferenceOrganizer(qe *db.QueryExecutor, conferenceId int, userId int) (Conference, error) {
 	o := &ConferenceOrganizer{
 		UserId:       userId,
 		ConferenceId: conferenceId,
 	}
-	query := "INSERT INTO " + o.TableName() + " (user_id, conference_id) VALUES ($1, $2)"
-	_, err := tx.Exec(
+	query := "INSERT INTO " + o.TableName() + " (user_id, conference_id) VALUES (?, ?)"
+	_, err := qe.Exec(
 		query,
 		o.UserId,
 		o.ConferenceId,
@@ -72,25 +74,31 @@ type ConferenceOrganizerMetrics struct {
 	TotalOrganizedConferences int     `db:"total_organized_conferences"`
 }
 
-func GetOrganizerLevelMetrics(tx *sqlx.Tx, organizerId string) (ConferenceOrganizerMetrics, error) {
+func GetOrganizerLevelMetrics(qe *db.QueryExecutor, organizerId int) (ConferenceOrganizerMetrics, error) {
 	var metrics ConferenceOrganizerMetrics
 	o := &ConferenceOrganizer{}
 	c := &Conference{}
 	cp := &ConferenceParticipant{}
 	query := `SELECT 
-					(SELECT COUNT(*) FROM ` + c.TableName() + ` WHERE id IN (SELECT conference_id FROM ` + o.TableName() + ` WHERE user_id = $1) AND NOW() BETWEEN start_date AND end_date) AS running_conferences_count,
-					(SELECT COUNT(*) FROM ` + cp.TableName() + ` WHERE conference_id IN (SELECT id FROM ` + c.TableName() + ` WHERE id IN (SELECT conference_id FROM ` + o.TableName() + ` WHERE user_id = $1))) AS participants_count,
-					(SELECT COUNT(*) FROM ` + o.TableName() + ` WHERE user_id = $1) AS total_organized_conferences`
-	err := tx.Get(
+					(SELECT COUNT(*) FROM ` + c.TableName() + ` WHERE id IN (SELECT conference_id FROM ` + o.TableName() + ` WHERE user_id = ?) AND datetime('now') BETWEEN start_date AND end_date) AS running_conferences_count,
+					(SELECT COUNT(*) FROM ` + cp.TableName() + ` WHERE conference_id IN (SELECT id FROM ` + c.TableName() + ` WHERE id IN (SELECT conference_id FROM ` + o.TableName() + ` WHERE user_id = ?))) AS participants_count,
+					(SELECT COUNT(*) FROM ` + o.TableName() + ` WHERE user_id = ?) AS total_organized_conferences`
+	err := sqlx.Get(
+		qe,
 		&metrics,
 		query,
 		organizerId,
+		organizerId,
+		organizerId,
 	)
 	if err != nil {
-		log.Println("Error getting organizer metrics: ", err)
 		return ConferenceOrganizerMetrics{}, err
 	}
-	metrics.AverageParticipantsCount = float64(metrics.ParticipantsCount) / float64(metrics.RunningConferencesCount)
+	if metrics.RunningConferencesCount > 0 {
+		metrics.AverageParticipantsCount = float64(metrics.ParticipantsCount) / float64(metrics.RunningConferencesCount)
+	} else {
+		metrics.AverageParticipantsCount = 0
+	}
 	return metrics, nil
 }
 
@@ -104,22 +112,21 @@ type ParticipantsTrend struct {
 	Granularity string
 }
 
-func GetParticipantsTrend(tx *sqlx.Tx, organizerId string) (*ParticipantsTrend, error) {
+func GetParticipantsTrend(qe *db.QueryExecutor, organizerId int) (*ParticipantsTrend, error) {
 	var counts []TrendEntry
 	granularity := "Daily"
 
 	var latestConference Conference
 	query := `
 		SELECT c.*
-		FROM public.conferences c
-		JOIN public.conference_organizers o ON c.id = o.conference_id
-		WHERE o.user_id = $1 AND c.start_date <= NOW() AND c.end_date >= NOW()
+		FROM ` + latestConference.TableName() + ` c
+		JOIN ` + (new(ConferenceOrganizer)).TableName() + `o ON c.id = o.conference_id
+		WHERE o.user_id = ? AND c.start_date <= datetime('now') AND c.end_date >= datetime('now')
 		ORDER BY c.start_date DESC
 		LIMIT 1
 	`
-	err := tx.Get(&latestConference, query, organizerId)
+	err := sqlx.Get(qe, &latestConference, query, organizerId)
 	if err != nil {
-		log.Println("Error getting latest conference: ", err)
 		return &ParticipantsTrend{
 			Trend:       counts,
 			Granularity: granularity,
@@ -147,12 +154,11 @@ func GetParticipantsTrend(tx *sqlx.Tx, organizerId string) (*ParticipantsTrend, 
 		query = `
 			SELECT COUNT(*)
 			FROM public.conference_participants
-			WHERE conference_id = $1 AND joined_at >= $2 AND joined_at < $3
+			WHERE conference_id = ? AND joined_at >= ? AND joined_at < ? 
 		`
 		nextTime := t.Add(interval)
-		err := tx.Get(&count, query, latestConference.Id, t, nextTime)
+		err := sqlx.Get(qe, &count, query, latestConference.Id, t, nextTime)
 		if err != nil {
-			log.Println("Error getting participants count: ", err)
 			return nil, err
 		}
 
@@ -161,7 +167,6 @@ func GetParticipantsTrend(tx *sqlx.Tx, organizerId string) (*ParticipantsTrend, 
 			Value: count,
 		})
 	}
-	log.Println("counts", counts)
 
 	return &ParticipantsTrend{
 		Trend:       counts,

@@ -5,7 +5,7 @@ import (
 )
 
 type Conference struct {
-	ID                   string     `json:"id"`
+	ID                   int        `json:"id"`
 	Title                string     `json:"title"`
 	StartDate            time.Time  `json:"start_date"`
 	EndDate              time.Time  `json:"end_date"`

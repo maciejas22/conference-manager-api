@@ -16,6 +16,17 @@ extend type Query {
   user: User @authenticated
 }
 
+input LoginUserInput {
+  email: String!
+  password: String!
+}
+
+input RegisterUserInput {
+  email: String!
+  password: String!
+  role: Role!
+}
+
 input UpdateUserInput {
   name: String!
   surname: String!
@@ -24,5 +35,7 @@ input UpdateUserInput {
 }
 
 extend type Mutation {
+  loginUser(loginUserInput: LoginUserInput!): String
+  registerUser(registerUserInput: RegisterUserInput!): String
   updateUser(updateUserInput: UpdateUserInput!): User @authenticated
 }

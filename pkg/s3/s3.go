@@ -1,9 +1,9 @@
 package s3
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -58,15 +58,7 @@ func (client *S3Client) GetFilesFromFolder(bucket string, folder string) ([]File
 
 	var files []File
 	for _, item := range result.Contents {
-		req, _ := client.s3.GetObjectRequest(&s3.GetObjectInput{
-			Bucket: aws.String(bucket),
-			Key:    item.Key,
-		})
-		url, err := req.Presign(time.Duration(config.AppConfig.S3UrlLifetimeInHours) * time.Hour)
-		if err != nil {
-			client.logger.Error("error getting presigned url", "error", err)
-			return nil, err
-		}
+		url := fmt.Sprintf("%s/%s/%s", config.AppConfig.S3Endpoint, bucket, *item.Key)
 
 		file := File{
 			ID:   *item.Key,

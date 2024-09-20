@@ -11,7 +11,7 @@ func ConvertUserRepoToSchema(u *repositories.User) *models.User {
 		Name:     u.Name,
 		Surname:  u.Surname,
 		Username: u.Username,
-		Email:    u.Email,
+		Email:    *u.Email,
 		Role:     models.Role(u.Role),
 	}
 }

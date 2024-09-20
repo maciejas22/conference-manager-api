@@ -27,7 +27,7 @@ type PageInfo {
 }
 
 type File {
-  id: ID!
+  id: String!
   name: String!
   url: String!
   size: Int!

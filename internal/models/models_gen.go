@@ -56,11 +56,16 @@ type CreateConferenceInputFile struct {
 }
 
 type DeleteFile struct {
-	ID string `json:"id"`
+	ID int `json:"id"`
+}
+
+type LoginUserInput struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type ModifyAgendaItemInput struct {
-	ID        *string   `json:"id,omitempty"`
+	ID        *int      `json:"id,omitempty"`
 	StartTime time.Time `json:"startTime"`
 	EndTime   time.Time `json:"endTime"`
 	Event     string    `json:"event"`
@@ -69,7 +74,7 @@ type ModifyAgendaItemInput struct {
 }
 
 type ModifyConferenceInput struct {
-	ID                   string                       `json:"id"`
+	ID                   int                          `json:"id"`
 	Title                *string                      `json:"title,omitempty"`
 	StartDate            *time.Time                   `json:"startDate,omitempty"`
 	EndDate              *time.Time                   `json:"endDate,omitempty"`
@@ -104,6 +109,12 @@ type ParticipantsJoiningTrend struct {
 }
 
 type Query struct {
+}
+
+type RegisterUserInput struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Role     Role   `json:"role"`
 }
 
 type UpdateUserInput struct {

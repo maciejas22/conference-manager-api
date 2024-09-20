@@ -136,12 +136,9 @@ extend type Query {
 }
 
 extend type Mutation {
-  createConference(createConferenceInput: CreateConferenceInput!): Conference!
+  createConference(createConferenceInput: CreateConferenceInput!): ID
     @hasRole(role: Organizer)
-  modifyConference(input: ModifyConferenceInput!): Conference!
-    @hasRole(role: Organizer)
-  addUserToConference(conferenceId: String!): Conference!
-    @hasRole(role: Participant)
-  removeUserFromConference(conferenceId: String!): Conference!
-    @hasRole(role: Participant)
+  modifyConference(input: ModifyConferenceInput!): ID @hasRole(role: Organizer)
+  addUserToConference(conferenceId: ID!): ID @hasRole(role: Participant)
+  removeUserFromConference(conferenceId: ID!): ID @hasRole(role: Participant)
 }

@@ -9,109 +9,56 @@ import (
 	"github.com/maciejas22/conference-manager/api/internal/models"
 )
 
-func GetParticipantsCount(ctx context.Context, db *db.DB, conferenceId string) (int, error) {
-	tx, err := db.Conn.BeginTxx(ctx, nil)
+func GetParticipantsCount(ctx context.Context, dbClient *db.DB, conferenceId int) (int, error) {
+	participantsCount, err := repositories.GetConferenceParticipantsCount(dbClient.QueryExecutor, conferenceId)
 	if err != nil {
-		return 0, err
-	}
-
-	participantsCount, err := repositories.GetConferenceParticipantsCount(tx, conferenceId)
-	if err != nil {
-		return 0, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
 
 	return participantsCount, nil
 }
 
-func AddUserToConference(ctx context.Context, db *db.DB, userId string, conferenceID string) (*models.Conference, error) {
-
-	tx, err := db.Conn.BeginTxx(ctx, nil)
+func AddUserToConference(ctx context.Context, dbClient *db.DB, userId int, conferenceID int) (*int, error) {
+	conference, err := repositories.AddConferenceParticipant(dbClient.QueryExecutor, conferenceID, userId)
 	if err != nil {
 		return nil, err
 	}
 
-	conference, err := repositories.AddConferenceParticipant(tx, conferenceID, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-
-	return converters.ConvertConferenceRepoToSchema(&conference), nil
+	cId := int(conference.Id)
+	return &cId, nil
 }
 
-func RemoveUserFromConference(ctx context.Context, db *db.DB, userId string, conferenceID string) (*models.Conference, error) {
-
-	tx, err := db.Conn.BeginTxx(ctx, nil)
+func RemoveUserFromConference(ctx context.Context, dbClient *db.DB, userId int, conferenceID int) (*int, error) {
+	conference, err := repositories.RemoveConferenceParticipant(dbClient.QueryExecutor, conferenceID, userId)
 	if err != nil {
 		return nil, err
 	}
 
-	conference, err := repositories.RemoveConferenceParticipant(tx, conferenceID, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-
-	return converters.ConvertConferenceRepoToSchema(&conference), nil
+	cId := int(conference.Id)
+	return &cId, nil
 }
 
-func IsConferenceParticipant(ctx context.Context, db *db.DB, userId, conferenceID string) (*bool, error) {
-	tx, err := db.Conn.BeginTxx(ctx, nil)
+func IsConferenceParticipant(ctx context.Context, dbClient *db.DB, userId, conferenceID int) (*bool, error) {
+	isParticipant, err := repositories.IsConferenceParticipant(dbClient.QueryExecutor, conferenceID, userId)
 	if err != nil {
-		return nil, err
-	}
-
-	isParticipant, err := repositories.IsConferenceParticipant(tx, conferenceID, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
 	return &isParticipant, nil
 }
 
-func IsConferenceOrganizer(ctx context.Context, db *db.DB, userId string, conferenceID string) (*bool, error) {
-	tx, err := db.Conn.BeginTxx(ctx, nil)
+func IsConferenceOrganizer(ctx context.Context, dbClient *db.DB, userId int, conferenceID int) (*bool, error) {
+	isOrganizer, err := repositories.IsConferenceOrganizer(dbClient.QueryExecutor, conferenceID, userId)
 	if err != nil {
 		return nil, err
 	}
 
-	isOrganizer, err := repositories.IsConferenceOrganizer(tx, conferenceID, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
 	return &isOrganizer, nil
 }
 
-func GetOrganizerMetrics(ctx context.Context, db *db.DB, organizerId string) (*models.OrganizerMetrics, error) {
-	tx, err := db.Conn.BeginTxx(ctx, nil)
+func GetOrganizerMetrics(ctx context.Context, dbClient *db.DB, organizerId int) (*models.OrganizerMetrics, error) {
+	organizerMetrics, err := repositories.GetOrganizerLevelMetrics(dbClient.QueryExecutor, organizerId)
 	if err != nil {
-		return nil, err
-	}
-
-	organizerMetrics, err := repositories.GetOrganizerLevelMetrics(tx, organizerId)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
@@ -123,18 +70,9 @@ func GetOrganizerMetrics(ctx context.Context, db *db.DB, organizerId string) (*m
 	}, nil
 }
 
-func GetParticipantsJoiningTrend(ctx context.Context, db *db.DB, organizerId string) (*models.ParticipantsJoiningTrend, error) {
-	tx, err := db.Conn.BeginTxx(ctx, nil)
+func GetParticipantsJoiningTrend(ctx context.Context, dbClient *db.DB, organizerId int) (*models.ParticipantsJoiningTrend, error) {
+	participantsJoiningTrend, err := repositories.GetParticipantsTrend(dbClient.QueryExecutor, organizerId)
 	if err != nil {
-		return nil, err
-	}
-
-	participantsJoiningTrend, err := repositories.GetParticipantsTrend(tx, organizerId)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 

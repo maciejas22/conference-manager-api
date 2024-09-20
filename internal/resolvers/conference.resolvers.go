@@ -6,7 +6,7 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
+	"strconv"
 
 	"github.com/maciejas22/conference-manager/api/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/auth"
@@ -28,55 +28,51 @@ func (r *conferenceResolver) EventsCount(ctx context.Context, obj *models.Confer
 	return services.GetAgendaItemsCount(ctx, r.dbClient, obj.ID)
 }
 
-func (r *mutationResolver) CreateConference(ctx context.Context, createConferenceInput models.CreateConferenceInput) (*models.Conference, error) {
-	c, _ := auth.FromContext(ctx)
-	return services.CreateConference(ctx, r.dbClient, r.s3Client, c.Subject, createConferenceInput)
+func (r *mutationResolver) CreateConference(ctx context.Context, createConferenceInput models.CreateConferenceInput) (*int, error) {
+	si := auth.GetSessionInfo(ctx)
+	return services.CreateConference(ctx, r.dbClient, r.s3Client, si.UserID, createConferenceInput)
 }
 
-func (r *mutationResolver) ModifyConference(ctx context.Context, input models.ModifyConferenceInput) (*models.Conference, error) {
+func (r *mutationResolver) ModifyConference(ctx context.Context, input models.ModifyConferenceInput) (*int, error) {
 	return services.ModifyConference(ctx, r.dbClient, r.s3Client, input)
 }
 
-func (r *mutationResolver) AddUserToConference(ctx context.Context, conferenceID string) (*models.Conference, error) {
-	c, _ := auth.FromContext(ctx)
-
-	return services.AddUserToConference(ctx, r.dbClient, c.Subject, conferenceID)
+func (r *mutationResolver) AddUserToConference(ctx context.Context, conferenceID int) (*int, error) {
+	si := auth.GetSessionInfo(ctx)
+	return services.AddUserToConference(ctx, r.dbClient, si.UserID, conferenceID)
 }
 
-func (r *mutationResolver) RemoveUserFromConference(ctx context.Context, conferenceID string) (*models.Conference, error) {
-	c, _ := auth.FromContext(ctx)
-
-	return services.RemoveUserFromConference(ctx, r.dbClient, c.Subject, conferenceID)
+func (r *mutationResolver) RemoveUserFromConference(ctx context.Context, conferenceID int) (*int, error) {
+	si := auth.GetSessionInfo(ctx)
+	return services.RemoveUserFromConference(ctx, r.dbClient, si.UserID, conferenceID)
 }
 
 func (r *queryResolver) Conferences(ctx context.Context, page *models.Page, sort *models.Sort, filters *models.ConferenceFilter) (*models.ConferencePage, error) {
-	c, _ := auth.FromContext(ctx)
-	return services.GetAllConferences(ctx, r.dbClient, c.Subject, page, sort, filters)
+	si := auth.GetSessionInfo(ctx)
+	return services.GetAllConferences(ctx, r.dbClient, si.UserID, page, sort, filters)
 }
 
 func (r *queryResolver) OrganizerMetrics(ctx context.Context) (*models.OrganizerMetrics, error) {
-	c, _ := auth.FromContext(ctx)
-	return services.GetOrganizerMetrics(ctx, r.dbClient, c.Subject)
+	si := auth.GetSessionInfo(ctx)
+	return services.GetOrganizerMetrics(ctx, r.dbClient, si.UserID)
 }
 
 func (r *queryResolver) ParticipantsJoiningTrend(ctx context.Context) (*models.ParticipantsJoiningTrend, error) {
-	c, _ := auth.FromContext(ctx)
-	x, e := services.GetParticipantsJoiningTrend(ctx, r.dbClient, c.Subject)
-	fmt.Println(*x.Trend[0])
-	return x, e
+	si := auth.GetSessionInfo(ctx)
+	return services.GetParticipantsJoiningTrend(ctx, r.dbClient, si.UserID)
 }
 
 func (r *queryResolver) ConferencesMetrics(ctx context.Context) (*models.ConferencesMetrics, error) {
 	return services.GetConferencesMetrics(ctx, r.dbClient)
 }
 
-func (r *queryResolver) Conference(ctx context.Context, id string) (*models.Conference, error) {
+func (r *queryResolver) Conference(ctx context.Context, id int) (*models.Conference, error) {
 	conferenceData, err := services.GetConference(ctx, r.dbClient, id)
 	if err != nil {
 		return nil, gqlerror.Errorf(err.Error())
 	}
 
-	conferenceFiles, err := repositories.GetFiles(ctx, r.s3Client, id)
+	conferenceFiles, err := repositories.GetFiles(ctx, r.s3Client, strconv.Itoa(id))
 	if err != nil {
 		return nil, gqlerror.Errorf(err.Error())
 	}
@@ -85,16 +81,14 @@ func (r *queryResolver) Conference(ctx context.Context, id string) (*models.Conf
 	return conferenceData, nil
 }
 
-func (r *queryResolver) IsParticipant(ctx context.Context, conferenceID string) (*bool, error) {
-	c, _ := auth.FromContext(ctx)
-
-	return services.IsConferenceParticipant(ctx, r.dbClient, c.Subject, conferenceID)
+func (r *queryResolver) IsParticipant(ctx context.Context, conferenceID int) (*bool, error) {
+	si := auth.GetSessionInfo(ctx)
+	return services.IsConferenceParticipant(ctx, r.dbClient, si.UserID, conferenceID)
 }
 
-func (r *queryResolver) IsOrganizer(ctx context.Context, conferenceID string) (*bool, error) {
-	c, _ := auth.FromContext(ctx)
-
-	return services.IsConferenceOrganizer(ctx, r.dbClient, c.Subject, conferenceID)
+func (r *queryResolver) IsOrganizer(ctx context.Context, conferenceID int) (*bool, error) {
+	si := auth.GetSessionInfo(ctx)
+	return services.IsConferenceOrganizer(ctx, r.dbClient, si.UserID, conferenceID)
 }
 
 func (r *Resolver) Conference() graph.ConferenceResolver { return &conferenceResolver{r} }

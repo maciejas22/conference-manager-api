@@ -6,24 +6,38 @@ package resolvers
 
 import (
 	"context"
+	"errors"
 
 	"github.com/maciejas22/conference-manager/api/internal/auth"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 	"github.com/maciejas22/conference-manager/api/internal/services"
-	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
-func (r *mutationResolver) UpdateUser(ctx context.Context, updateUserInput models.UpdateUserInput) (*models.User, error) {
-	u, _ := auth.FromContext(ctx)
+func (r *mutationResolver) LoginUser(ctx context.Context, loginUserInput models.LoginUserInput) (*string, error) {
+	sessionID, err := services.LoginUser(ctx, r.dbClient, loginUserInput)
+	if err != nil {
+		return nil, err
+	}
 
-	return services.UpdateUser(ctx, r.dbClient, u.Subject, updateUserInput)
+	sessionInfo := auth.GetSessionInfo(ctx)
+	if sessionInfo == nil {
+		return nil, errors.New("sessionInfo is nil")
+	}
+	sessionInfo.SessionId = *sessionID
+
+	return sessionID, nil
+}
+
+func (r *mutationResolver) RegisterUser(ctx context.Context, registerUserInput models.RegisterUserInput) (*string, error) {
+	return services.RegisterUser(ctx, r.dbClient, registerUserInput)
+}
+
+func (r *mutationResolver) UpdateUser(ctx context.Context, updateUserInput models.UpdateUserInput) (*models.User, error) {
+	si := auth.GetSessionInfo(ctx)
+	return services.UpdateUser(ctx, r.dbClient, si.UserID, updateUserInput)
 }
 
 func (r *queryResolver) User(ctx context.Context) (*models.User, error) {
-	u, ok := auth.FromContext(ctx)
-	if !ok {
-		return nil, gqlerror.Errorf("unauthorized user")
-	}
-
-	return services.GetUserData(ctx, r.dbClient, u.Subject)
+	si := auth.GetSessionInfo(ctx)
+	return services.GetUserData(ctx, r.dbClient, si.UserID)
 }

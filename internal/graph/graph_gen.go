@@ -106,10 +106,12 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddUserToConference      func(childComplexity int, conferenceID string) int
+		AddUserToConference      func(childComplexity int, conferenceID int) int
 		CreateConference         func(childComplexity int, createConferenceInput models.CreateConferenceInput) int
+		LoginUser                func(childComplexity int, loginUserInput models.LoginUserInput) int
 		ModifyConference         func(childComplexity int, input models.ModifyConferenceInput) int
-		RemoveUserFromConference func(childComplexity int, conferenceID string) int
+		RegisterUser             func(childComplexity int, registerUserInput models.RegisterUserInput) int
+		RemoveUserFromConference func(childComplexity int, conferenceID int) int
 		UpdateUser               func(childComplexity int, updateUserInput models.UpdateUserInput) int
 	}
 
@@ -140,11 +142,11 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Conference               func(childComplexity int, id string) int
+		Conference               func(childComplexity int, id int) int
 		Conferences              func(childComplexity int, page *models.Page, sort *models.Sort, filters *models.ConferenceFilter) int
 		ConferencesMetrics       func(childComplexity int) int
-		IsOrganizer              func(childComplexity int, conferenceID string) int
-		IsParticipant            func(childComplexity int, conferenceID string) int
+		IsOrganizer              func(childComplexity int, conferenceID int) int
+		IsParticipant            func(childComplexity int, conferenceID int) int
 		News                     func(childComplexity int) int
 		OrganizerMetrics         func(childComplexity int) int
 		ParticipantsJoiningTrend func(childComplexity int) int
@@ -190,10 +192,12 @@ type ConferenceResolver interface {
 	EventsCount(ctx context.Context, obj *models.Conference) (int, error)
 }
 type MutationResolver interface {
-	CreateConference(ctx context.Context, createConferenceInput models.CreateConferenceInput) (*models.Conference, error)
-	ModifyConference(ctx context.Context, input models.ModifyConferenceInput) (*models.Conference, error)
-	AddUserToConference(ctx context.Context, conferenceID string) (*models.Conference, error)
-	RemoveUserFromConference(ctx context.Context, conferenceID string) (*models.Conference, error)
+	CreateConference(ctx context.Context, createConferenceInput models.CreateConferenceInput) (*int, error)
+	ModifyConference(ctx context.Context, input models.ModifyConferenceInput) (*int, error)
+	AddUserToConference(ctx context.Context, conferenceID int) (*int, error)
+	RemoveUserFromConference(ctx context.Context, conferenceID int) (*int, error)
+	LoginUser(ctx context.Context, loginUserInput models.LoginUserInput) (*string, error)
+	RegisterUser(ctx context.Context, registerUserInput models.RegisterUserInput) (*string, error)
 	UpdateUser(ctx context.Context, updateUserInput models.UpdateUserInput) (*models.User, error)
 }
 type QueryResolver interface {
@@ -201,9 +205,9 @@ type QueryResolver interface {
 	OrganizerMetrics(ctx context.Context) (*models.OrganizerMetrics, error)
 	ParticipantsJoiningTrend(ctx context.Context) (*models.ParticipantsJoiningTrend, error)
 	ConferencesMetrics(ctx context.Context) (*models.ConferencesMetrics, error)
-	Conference(ctx context.Context, id string) (*models.Conference, error)
-	IsParticipant(ctx context.Context, conferenceID string) (*bool, error)
-	IsOrganizer(ctx context.Context, conferenceID string) (*bool, error)
+	Conference(ctx context.Context, id int) (*models.Conference, error)
+	IsParticipant(ctx context.Context, conferenceID int) (*bool, error)
+	IsOrganizer(ctx context.Context, conferenceID int) (*bool, error)
 	News(ctx context.Context) ([]*models.News, error)
 	TermsAndConditions(ctx context.Context) (*models.TermsOfService, error)
 	User(ctx context.Context) (*models.User, error)
@@ -468,7 +472,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.AddUserToConference(childComplexity, args["conferenceId"].(string)), true
+		return e.complexity.Mutation.AddUserToConference(childComplexity, args["conferenceId"].(int)), true
 
 	case "Mutation.createConference":
 		if e.complexity.Mutation.CreateConference == nil {
@@ -482,6 +486,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.CreateConference(childComplexity, args["createConferenceInput"].(models.CreateConferenceInput)), true
 
+	case "Mutation.loginUser":
+		if e.complexity.Mutation.LoginUser == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_loginUser_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.LoginUser(childComplexity, args["loginUserInput"].(models.LoginUserInput)), true
+
 	case "Mutation.modifyConference":
 		if e.complexity.Mutation.ModifyConference == nil {
 			break
@@ -494,6 +510,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.ModifyConference(childComplexity, args["input"].(models.ModifyConferenceInput)), true
 
+	case "Mutation.registerUser":
+		if e.complexity.Mutation.RegisterUser == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_registerUser_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RegisterUser(childComplexity, args["registerUserInput"].(models.RegisterUserInput)), true
+
 	case "Mutation.removeUserFromConference":
 		if e.complexity.Mutation.RemoveUserFromConference == nil {
 			break
@@ -504,7 +532,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.RemoveUserFromConference(childComplexity, args["conferenceId"].(string)), true
+		return e.complexity.Mutation.RemoveUserFromConference(childComplexity, args["conferenceId"].(int)), true
 
 	case "Mutation.updateUser":
 		if e.complexity.Mutation.UpdateUser == nil {
@@ -626,7 +654,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Conference(childComplexity, args["id"].(string)), true
+		return e.complexity.Query.Conference(childComplexity, args["id"].(int)), true
 
 	case "Query.conferences":
 		if e.complexity.Query.Conferences == nil {
@@ -657,7 +685,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.IsOrganizer(childComplexity, args["conferenceId"].(string)), true
+		return e.complexity.Query.IsOrganizer(childComplexity, args["conferenceId"].(int)), true
 
 	case "Query.isParticipant":
 		if e.complexity.Query.IsParticipant == nil {
@@ -669,7 +697,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.IsParticipant(childComplexity, args["conferenceId"].(string)), true
+		return e.complexity.Query.IsParticipant(childComplexity, args["conferenceId"].(int)), true
 
 	case "Query.news":
 		if e.complexity.Query.News == nil {
@@ -845,10 +873,12 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCreateConferenceInput,
 		ec.unmarshalInputCreateConferenceInputFile,
 		ec.unmarshalInputDeleteFile,
+		ec.unmarshalInputLoginUserInput,
 		ec.unmarshalInputModifyAgendaItemInput,
 		ec.unmarshalInputModifyConferenceInput,
 		ec.unmarshalInputModifyConferenceInputFile,
 		ec.unmarshalInputPage,
+		ec.unmarshalInputRegisterUserInput,
 		ec.unmarshalInputSort,
 		ec.unmarshalInputUpdateUserInput,
 		ec.unmarshalInputUploadFile,
@@ -1087,14 +1117,11 @@ extend type Query {
 }
 
 extend type Mutation {
-  createConference(createConferenceInput: CreateConferenceInput!): Conference!
+  createConference(createConferenceInput: CreateConferenceInput!): ID
     @hasRole(role: Organizer)
-  modifyConference(input: ModifyConferenceInput!): Conference!
-    @hasRole(role: Organizer)
-  addUserToConference(conferenceId: String!): Conference!
-    @hasRole(role: Participant)
-  removeUserFromConference(conferenceId: String!): Conference!
-    @hasRole(role: Participant)
+  modifyConference(input: ModifyConferenceInput!): ID @hasRole(role: Organizer)
+  addUserToConference(conferenceId: ID!): ID @hasRole(role: Participant)
+  removeUserFromConference(conferenceId: ID!): ID @hasRole(role: Participant)
 }
 `, BuiltIn: false},
 	{Name: "../schema/info.graphqls", Input: `type News {
@@ -1159,7 +1186,7 @@ type PageInfo {
 }
 
 type File {
-  id: ID!
+  id: String!
   name: String!
   url: String!
   size: Int!
@@ -1192,6 +1219,17 @@ extend type Query {
   user: User @authenticated
 }
 
+input LoginUserInput {
+  email: String!
+  password: String!
+}
+
+input RegisterUserInput {
+  email: String!
+  password: String!
+  role: Role!
+}
+
 input UpdateUserInput {
   name: String!
   surname: String!
@@ -1200,6 +1238,8 @@ input UpdateUserInput {
 }
 
 extend type Mutation {
+  loginUser(loginUserInput: LoginUserInput!): String
+  registerUser(registerUserInput: RegisterUserInput!): String
   updateUser(updateUserInput: UpdateUserInput!): User @authenticated
 }
 `, BuiltIn: false},
@@ -1228,10 +1268,10 @@ func (ec *executionContext) dir_hasRole_args(ctx context.Context, rawArgs map[st
 func (ec *executionContext) field_Mutation_addUserToConference_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 int
 	if tmp, ok := rawArgs["conferenceId"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("conferenceId"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		arg0, err = ec.unmarshalNID2int(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -1255,6 +1295,21 @@ func (ec *executionContext) field_Mutation_createConference_args(ctx context.Con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_loginUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 models.LoginUserInput
+	if tmp, ok := rawArgs["loginUserInput"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("loginUserInput"))
+		arg0, err = ec.unmarshalNLoginUserInput2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐLoginUserInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["loginUserInput"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_modifyConference_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -1270,13 +1325,28 @@ func (ec *executionContext) field_Mutation_modifyConference_args(ctx context.Con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_registerUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 models.RegisterUserInput
+	if tmp, ok := rawArgs["registerUserInput"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("registerUserInput"))
+		arg0, err = ec.unmarshalNRegisterUserInput2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRegisterUserInput(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["registerUserInput"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_removeUserFromConference_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 int
 	if tmp, ok := rawArgs["conferenceId"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("conferenceId"))
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		arg0, err = ec.unmarshalNID2int(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -1318,10 +1388,10 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 func (ec *executionContext) field_Query_conference_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 int
 	if tmp, ok := rawArgs["id"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		arg0, err = ec.unmarshalNID2int(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -1366,10 +1436,10 @@ func (ec *executionContext) field_Query_conferences_args(ctx context.Context, ra
 func (ec *executionContext) field_Query_isOrganizer_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 int
 	if tmp, ok := rawArgs["conferenceId"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("conferenceId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		arg0, err = ec.unmarshalNID2int(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -1381,10 +1451,10 @@ func (ec *executionContext) field_Query_isOrganizer_args(ctx context.Context, ra
 func (ec *executionContext) field_Query_isParticipant_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
+	var arg0 int
 	if tmp, ok := rawArgs["conferenceId"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("conferenceId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		arg0, err = ec.unmarshalNID2int(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -1457,9 +1527,9 @@ func (ec *executionContext) _AgendaItem_id(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_AgendaItem_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1765,9 +1835,9 @@ func (ec *executionContext) _Conference_id(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Conference_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2742,7 +2812,7 @@ func (ec *executionContext) _File_id(ctx context.Context, field graphql.Collecte
 	}
 	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_File_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2752,7 +2822,7 @@ func (ec *executionContext) fieldContext_File_id(ctx context.Context, field grap
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -2925,24 +2995,21 @@ func (ec *executionContext) _Mutation_createConference(ctx context.Context, fiel
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*models.Conference); ok {
+		if data, ok := tmp.(*int); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.Conference`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *int`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(*models.Conference)
+	res := resTmp.(*int)
 	fc.Result = res
-	return ec.marshalNConference2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConference(ctx, field.Selections, res)
+	return ec.marshalOID2ᚖint(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_createConference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2952,37 +3019,7 @@ func (ec *executionContext) fieldContext_Mutation_createConference(ctx context.C
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Conference_id(ctx, field)
-			case "title":
-				return ec.fieldContext_Conference_title(ctx, field)
-			case "startDate":
-				return ec.fieldContext_Conference_startDate(ctx, field)
-			case "endDate":
-				return ec.fieldContext_Conference_endDate(ctx, field)
-			case "location":
-				return ec.fieldContext_Conference_location(ctx, field)
-			case "website":
-				return ec.fieldContext_Conference_website(ctx, field)
-			case "acronym":
-				return ec.fieldContext_Conference_acronym(ctx, field)
-			case "additionalInfo":
-				return ec.fieldContext_Conference_additionalInfo(ctx, field)
-			case "agenda":
-				return ec.fieldContext_Conference_agenda(ctx, field)
-			case "participantsCount":
-				return ec.fieldContext_Conference_participantsCount(ctx, field)
-			case "participantsLimit":
-				return ec.fieldContext_Conference_participantsLimit(ctx, field)
-			case "registrationDeadline":
-				return ec.fieldContext_Conference_registrationDeadline(ctx, field)
-			case "files":
-				return ec.fieldContext_Conference_files(ctx, field)
-			case "eventsCount":
-				return ec.fieldContext_Conference_eventsCount(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Conference", field.Name)
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	defer func() {
@@ -3034,24 +3071,21 @@ func (ec *executionContext) _Mutation_modifyConference(ctx context.Context, fiel
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*models.Conference); ok {
+		if data, ok := tmp.(*int); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.Conference`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *int`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(*models.Conference)
+	res := resTmp.(*int)
 	fc.Result = res
-	return ec.marshalNConference2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConference(ctx, field.Selections, res)
+	return ec.marshalOID2ᚖint(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_modifyConference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3061,37 +3095,7 @@ func (ec *executionContext) fieldContext_Mutation_modifyConference(ctx context.C
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Conference_id(ctx, field)
-			case "title":
-				return ec.fieldContext_Conference_title(ctx, field)
-			case "startDate":
-				return ec.fieldContext_Conference_startDate(ctx, field)
-			case "endDate":
-				return ec.fieldContext_Conference_endDate(ctx, field)
-			case "location":
-				return ec.fieldContext_Conference_location(ctx, field)
-			case "website":
-				return ec.fieldContext_Conference_website(ctx, field)
-			case "acronym":
-				return ec.fieldContext_Conference_acronym(ctx, field)
-			case "additionalInfo":
-				return ec.fieldContext_Conference_additionalInfo(ctx, field)
-			case "agenda":
-				return ec.fieldContext_Conference_agenda(ctx, field)
-			case "participantsCount":
-				return ec.fieldContext_Conference_participantsCount(ctx, field)
-			case "participantsLimit":
-				return ec.fieldContext_Conference_participantsLimit(ctx, field)
-			case "registrationDeadline":
-				return ec.fieldContext_Conference_registrationDeadline(ctx, field)
-			case "files":
-				return ec.fieldContext_Conference_files(ctx, field)
-			case "eventsCount":
-				return ec.fieldContext_Conference_eventsCount(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Conference", field.Name)
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	defer func() {
@@ -3123,7 +3127,7 @@ func (ec *executionContext) _Mutation_addUserToConference(ctx context.Context, f
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().AddUserToConference(rctx, fc.Args["conferenceId"].(string))
+			return ec.resolvers.Mutation().AddUserToConference(rctx, fc.Args["conferenceId"].(int))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			role, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, "Participant")
@@ -3143,24 +3147,21 @@ func (ec *executionContext) _Mutation_addUserToConference(ctx context.Context, f
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*models.Conference); ok {
+		if data, ok := tmp.(*int); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.Conference`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *int`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(*models.Conference)
+	res := resTmp.(*int)
 	fc.Result = res
-	return ec.marshalNConference2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConference(ctx, field.Selections, res)
+	return ec.marshalOID2ᚖint(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_addUserToConference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3170,37 +3171,7 @@ func (ec *executionContext) fieldContext_Mutation_addUserToConference(ctx contex
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Conference_id(ctx, field)
-			case "title":
-				return ec.fieldContext_Conference_title(ctx, field)
-			case "startDate":
-				return ec.fieldContext_Conference_startDate(ctx, field)
-			case "endDate":
-				return ec.fieldContext_Conference_endDate(ctx, field)
-			case "location":
-				return ec.fieldContext_Conference_location(ctx, field)
-			case "website":
-				return ec.fieldContext_Conference_website(ctx, field)
-			case "acronym":
-				return ec.fieldContext_Conference_acronym(ctx, field)
-			case "additionalInfo":
-				return ec.fieldContext_Conference_additionalInfo(ctx, field)
-			case "agenda":
-				return ec.fieldContext_Conference_agenda(ctx, field)
-			case "participantsCount":
-				return ec.fieldContext_Conference_participantsCount(ctx, field)
-			case "participantsLimit":
-				return ec.fieldContext_Conference_participantsLimit(ctx, field)
-			case "registrationDeadline":
-				return ec.fieldContext_Conference_registrationDeadline(ctx, field)
-			case "files":
-				return ec.fieldContext_Conference_files(ctx, field)
-			case "eventsCount":
-				return ec.fieldContext_Conference_eventsCount(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Conference", field.Name)
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	defer func() {
@@ -3232,7 +3203,7 @@ func (ec *executionContext) _Mutation_removeUserFromConference(ctx context.Conte
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().RemoveUserFromConference(rctx, fc.Args["conferenceId"].(string))
+			return ec.resolvers.Mutation().RemoveUserFromConference(rctx, fc.Args["conferenceId"].(int))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			role, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, "Participant")
@@ -3252,24 +3223,21 @@ func (ec *executionContext) _Mutation_removeUserFromConference(ctx context.Conte
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*models.Conference); ok {
+		if data, ok := tmp.(*int); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.Conference`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *int`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(*models.Conference)
+	res := resTmp.(*int)
 	fc.Result = res
-	return ec.marshalNConference2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConference(ctx, field.Selections, res)
+	return ec.marshalOID2ᚖint(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_removeUserFromConference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3279,37 +3247,7 @@ func (ec *executionContext) fieldContext_Mutation_removeUserFromConference(ctx c
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Conference_id(ctx, field)
-			case "title":
-				return ec.fieldContext_Conference_title(ctx, field)
-			case "startDate":
-				return ec.fieldContext_Conference_startDate(ctx, field)
-			case "endDate":
-				return ec.fieldContext_Conference_endDate(ctx, field)
-			case "location":
-				return ec.fieldContext_Conference_location(ctx, field)
-			case "website":
-				return ec.fieldContext_Conference_website(ctx, field)
-			case "acronym":
-				return ec.fieldContext_Conference_acronym(ctx, field)
-			case "additionalInfo":
-				return ec.fieldContext_Conference_additionalInfo(ctx, field)
-			case "agenda":
-				return ec.fieldContext_Conference_agenda(ctx, field)
-			case "participantsCount":
-				return ec.fieldContext_Conference_participantsCount(ctx, field)
-			case "participantsLimit":
-				return ec.fieldContext_Conference_participantsLimit(ctx, field)
-			case "registrationDeadline":
-				return ec.fieldContext_Conference_registrationDeadline(ctx, field)
-			case "files":
-				return ec.fieldContext_Conference_files(ctx, field)
-			case "eventsCount":
-				return ec.fieldContext_Conference_eventsCount(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Conference", field.Name)
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	defer func() {
@@ -3320,6 +3258,110 @@ func (ec *executionContext) fieldContext_Mutation_removeUserFromConference(ctx c
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_removeUserFromConference_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_loginUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_loginUser(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().LoginUser(rctx, fc.Args["loginUserInput"].(models.LoginUserInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_loginUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_loginUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_registerUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_registerUser(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().RegisterUser(rctx, fc.Args["registerUserInput"].(models.RegisterUserInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_registerUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_registerUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -3438,9 +3480,9 @@ func (ec *executionContext) _News_id(ctx context.Context, field graphql.Collecte
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_News_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -4340,7 +4382,7 @@ func (ec *executionContext) _Query_conference(ctx context.Context, field graphql
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().Conference(rctx, fc.Args["id"].(string))
+			return ec.resolvers.Query().Conference(rctx, fc.Args["id"].(int))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.Authenticated == nil {
@@ -4442,7 +4484,7 @@ func (ec *executionContext) _Query_isParticipant(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().IsParticipant(rctx, fc.Args["conferenceId"].(string))
+			return ec.resolvers.Query().IsParticipant(rctx, fc.Args["conferenceId"].(int))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			role, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, "Participant")
@@ -4518,7 +4560,7 @@ func (ec *executionContext) _Query_isOrganizer(ctx context.Context, field graphq
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().IsOrganizer(rctx, fc.Args["conferenceId"].(string))
+			return ec.resolvers.Query().IsOrganizer(rctx, fc.Args["conferenceId"].(int))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			role, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, "Organizer")
@@ -4959,9 +5001,9 @@ func (ec *executionContext) _Section_id(ctx context.Context, field graphql.Colle
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Section_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -5137,9 +5179,9 @@ func (ec *executionContext) _SubSection_id(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_SubSection_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -5263,9 +5305,9 @@ func (ec *executionContext) _TermsOfService_id(ctx context.Context, field graphq
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_TermsOfService_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -5493,9 +5535,9 @@ func (ec *executionContext) _User_id(ctx context.Context, field graphql.Collecte
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_User_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7717,11 +7759,45 @@ func (ec *executionContext) unmarshalInputDeleteFile(ctx context.Context, obj in
 		switch k {
 		case "id":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-			data, err := ec.unmarshalNID2string(ctx, v)
+			data, err := ec.unmarshalNID2int(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.ID = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputLoginUserInput(ctx context.Context, obj interface{}) (models.LoginUserInput, error) {
+	var it models.LoginUserInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"email", "password"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "email":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Email = data
+		case "password":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Password = data
 		}
 	}
 
@@ -7744,7 +7820,7 @@ func (ec *executionContext) unmarshalInputModifyAgendaItemInput(ctx context.Cont
 		switch k {
 		case "id":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-			data, err := ec.unmarshalOID2ᚖstring(ctx, v)
+			data, err := ec.unmarshalOID2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -7806,7 +7882,7 @@ func (ec *executionContext) unmarshalInputModifyConferenceInput(ctx context.Cont
 		switch k {
 		case "id":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-			data, err := ec.unmarshalNID2string(ctx, v)
+			data, err := ec.unmarshalNID2int(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -7956,6 +8032,47 @@ func (ec *executionContext) unmarshalInputPage(ctx context.Context, obj interfac
 				return it, err
 			}
 			it.Size = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputRegisterUserInput(ctx context.Context, obj interface{}) (models.RegisterUserInput, error) {
+	var it models.RegisterUserInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"email", "password", "role"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "email":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Email = data
+		case "password":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Password = data
+		case "role":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+			data, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Role = data
 		}
 	}
 
@@ -8585,30 +8702,26 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createConference(ctx, field)
 			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "modifyConference":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_modifyConference(ctx, field)
 			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "addUserToConference":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_addUserToConference(ctx, field)
 			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "removeUserFromConference":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_removeUserFromConference(ctx, field)
 			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
+		case "loginUser":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_loginUser(ctx, field)
+			})
+		case "registerUser":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_registerUser(ctx, field)
+			})
 		case "updateUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateUser(ctx, field)
@@ -9804,10 +9917,6 @@ func (ec *executionContext) marshalNChartTrend2ᚖgithubᚗcomᚋmaciejas22ᚋco
 	return ec._ChartTrend(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNConference2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConference(ctx context.Context, sel ast.SelectionSet, v models.Conference) graphql.Marshaler {
-	return ec._Conference(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNConference2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferenceᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Conference) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -9966,13 +10075,13 @@ func (ec *executionContext) marshalNGranularity2githubᚗcomᚋmaciejas22ᚋconf
 	return v
 }
 
-func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface{}) (string, error) {
-	res, err := graphql.UnmarshalID(v)
+func (ec *executionContext) unmarshalNID2int(ctx context.Context, v interface{}) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
-	res := graphql.MarshalID(v)
+func (ec *executionContext) marshalNID2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	res := graphql.MarshalInt(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -10009,6 +10118,11 @@ func (ec *executionContext) marshalNInt2int64(ctx context.Context, sel ast.Selec
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNLoginUserInput2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐLoginUserInput(ctx context.Context, v interface{}) (models.LoginUserInput, error) {
+	res, err := ec.unmarshalInputLoginUserInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNModifyAgendaItemInput2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐModifyAgendaItemInput(ctx context.Context, v interface{}) (*models.ModifyAgendaItemInput, error) {
@@ -10098,6 +10212,11 @@ func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmaciejas22ᚋconf
 		return graphql.Null
 	}
 	return ec._PageInfo(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNRegisterUserInput2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRegisterUserInput(ctx context.Context, v interface{}) (models.RegisterUserInput, error) {
+	res, err := ec.unmarshalInputRegisterUserInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx context.Context, v interface{}) (models.Role, error) {
@@ -10623,19 +10742,19 @@ func (ec *executionContext) unmarshalODeleteFile2ᚖgithubᚗcomᚋmaciejas22ᚋ
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v interface{}) (*string, error) {
+func (ec *executionContext) unmarshalOID2ᚖint(ctx context.Context, v interface{}) (*int, error) {
 	if v == nil {
 		return nil, nil
 	}
-	res, err := graphql.UnmarshalID(v)
+	res, err := graphql.UnmarshalInt(v)
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOID2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler {
+func (ec *executionContext) marshalOID2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	res := graphql.MarshalID(*v)
+	res := graphql.MarshalInt(*v)
 	return res
 }
 
