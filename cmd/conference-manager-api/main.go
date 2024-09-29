@@ -22,11 +22,27 @@ import (
 	"github.com/maciejas22/conference-manager/api/pkg/s3"
 )
 
-func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+func initializeLogger(config *config.Config) *slog.Logger {
+	var level slog.Level
+	if config.GoEnv == "dev" {
+		level = slog.LevelDebug
+	} else {
+		level = slog.LevelInfo
+	}
 
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: level,
+	})
+
+	logger := slog.New(handler)
+	return logger
+}
+
+func main() {
 	ctx := context.Background()
 	config.LoadConfig()
+
+	logger := initializeLogger(config.AppConfig)
 
 	r := chi.NewRouter()
 	r.Use(cors.New(cors.Options{
@@ -48,13 +64,13 @@ func main() {
 		logger.Error("failed to connect to s3", "error", err)
 	}
 
-	middlewares.LoadMiddlewares(r)
-
 	resolver := resolvers.NewResolver(ctx, db, s3)
 	c := graph.Config{Resolvers: resolver}
 	c.Directives.Authenticated = directives.Authenticated
 	c.Directives.HasRole = directives.HasRole
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(c))
+
+	middlewares.LoadMiddlewares(r, srv, db, logger)
 
 	port := config.AppConfig.Port
 	r.Handle("/graphql", srv)

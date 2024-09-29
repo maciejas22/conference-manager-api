@@ -2,16 +2,16 @@ package directives
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/maciejas22/conference-manager/api/internal/auth"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 func Authenticated(ctx context.Context, obj interface{}, next graphql.Resolver) (interface{}, error) {
-	_, ok := auth.FromContext(ctx)
-	if !ok {
-		return nil, fmt.Errorf("unauthenticated")
+	si := auth.GetSessionInfo(ctx)
+	if si.UserId == 0 {
+		return nil, gqlerror.Errorf("Unauthenticated")
 	}
 
 	return next(ctx)

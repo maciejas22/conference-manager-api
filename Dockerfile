@@ -15,7 +15,9 @@ RUN GO_ENV=prod make build
 FROM debian:bookworm
 
 WORKDIR /usr/src/app
-RUN apt-get update && apt-get install -y ca-certificates
+RUN apt-get update -y && apt-get install -y ca-certificates 
+
+
 COPY --from=builder /usr/src/app /usr/src/app
 
 ENV GO_ENV=prod

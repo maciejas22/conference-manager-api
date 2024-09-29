@@ -6,10 +6,9 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/maciejas22/conference-manager/api/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/auth"
+	"github.com/maciejas22/conference-manager/api/internal/files"
 	"github.com/maciejas22/conference-manager/api/internal/graph"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 	"github.com/maciejas22/conference-manager/api/internal/services"
@@ -24,85 +23,88 @@ func (r *conferenceResolver) ParticipantsCount(ctx context.Context, obj *models.
 	return services.GetParticipantsCount(ctx, r.dbClient, obj.ID)
 }
 
+func (r *conferenceResolver) Files(ctx context.Context, obj *models.Conference) ([]*models.File, error) {
+	conferenceFiles, err := files.GetConferenceFiles(ctx, r.s3Client, obj.ID)
+	if err != nil {
+		return nil, gqlerror.Errorf(err.Error())
+	}
+
+	return conferenceFiles, nil
+}
+
 func (r *conferenceResolver) EventsCount(ctx context.Context, obj *models.Conference) (int, error) {
 	return services.GetAgendaItemsCount(ctx, r.dbClient, obj.ID)
 }
 
-func (r *mutationResolver) CreateConference(ctx context.Context, createConferenceInput models.CreateConferenceInput) (*models.Conference, error) {
-	c, _ := auth.FromContext(ctx)
-	return services.CreateConference(ctx, r.dbClient, r.s3Client, c.Subject, createConferenceInput)
+func (r *conferencesPageResolver) Metrics(ctx context.Context, obj *models.ConferencesPage) (*models.ConferencesMetrics, error) {
+	m, err := services.GetConferencesMetrics(ctx, r.dbClient)
+	if err != nil {
+		return nil, gqlerror.Errorf("Failed to get conferences metrics")
+	}
+
+	return m, nil
 }
 
-func (r *mutationResolver) ModifyConference(ctx context.Context, input models.ModifyConferenceInput) (*models.Conference, error) {
-	return services.ModifyConference(ctx, r.dbClient, r.s3Client, input)
+func (r *mutationResolver) CreateConference(ctx context.Context, createConferenceInput models.CreateConferenceInput) (int, error) {
+	si := auth.GetSessionInfo(ctx)
+	c, err := services.CreateConference(ctx, r.dbClient, r.s3Client, si.UserId, createConferenceInput)
+	if err != nil {
+		return 0, gqlerror.Errorf("Failed to create conference")
+	}
+	return *c, nil
 }
 
-func (r *mutationResolver) AddUserToConference(ctx context.Context, conferenceID string) (*models.Conference, error) {
-	c, _ := auth.FromContext(ctx)
-
-	return services.AddUserToConference(ctx, r.dbClient, c.Subject, conferenceID)
+func (r *mutationResolver) ModifyConference(ctx context.Context, input models.ModifyConferenceInput) (int, error) {
+	c, err := services.ModifyConference(ctx, r.dbClient, r.s3Client, input)
+	if err != nil {
+		return 0, gqlerror.Errorf("Failed to modify conference")
+	}
+	return *c, nil
 }
 
-func (r *mutationResolver) RemoveUserFromConference(ctx context.Context, conferenceID string) (*models.Conference, error) {
-	c, _ := auth.FromContext(ctx)
-
-	return services.RemoveUserFromConference(ctx, r.dbClient, c.Subject, conferenceID)
+func (r *mutationResolver) AddUserToConference(ctx context.Context, conferenceID int) (int, error) {
+	si := auth.GetSessionInfo(ctx)
+	cId, err := services.AddUserToConference(ctx, r.dbClient, si.UserId, conferenceID)
+	if err != nil {
+		return 0, gqlerror.Errorf("Failed to add user to conference")
+	}
+	return *cId, nil
 }
 
-func (r *queryResolver) Conferences(ctx context.Context, page *models.Page, sort *models.Sort, filters *models.ConferenceFilter) (*models.ConferencePage, error) {
-	c, _ := auth.FromContext(ctx)
-	return services.GetAllConferences(ctx, r.dbClient, c.Subject, page, sort, filters)
+func (r *mutationResolver) RemoveUserFromConference(ctx context.Context, conferenceID int) (int, error) {
+	si := auth.GetSessionInfo(ctx)
+	cId, err := services.RemoveUserFromConference(ctx, r.dbClient, si.UserId, conferenceID)
+	if err != nil {
+		return 0, gqlerror.Errorf("Failed to remove user from conference")
+	}
+	return *cId, nil
 }
 
-func (r *queryResolver) OrganizerMetrics(ctx context.Context) (*models.OrganizerMetrics, error) {
-	c, _ := auth.FromContext(ctx)
-	return services.GetOrganizerMetrics(ctx, r.dbClient, c.Subject)
-}
-
-func (r *queryResolver) ParticipantsJoiningTrend(ctx context.Context) (*models.ParticipantsJoiningTrend, error) {
-	c, _ := auth.FromContext(ctx)
-	x, e := services.GetParticipantsJoiningTrend(ctx, r.dbClient, c.Subject)
-	fmt.Println(*x.Trend[0])
-	return x, e
-}
-
-func (r *queryResolver) ConferencesMetrics(ctx context.Context) (*models.ConferencesMetrics, error) {
-	return services.GetConferencesMetrics(ctx, r.dbClient)
-}
-
-func (r *queryResolver) Conference(ctx context.Context, id string) (*models.Conference, error) {
+func (r *queryResolver) Conference(ctx context.Context, id int) (*models.Conference, error) {
 	conferenceData, err := services.GetConference(ctx, r.dbClient, id)
 	if err != nil {
 		return nil, gqlerror.Errorf(err.Error())
 	}
 
-	conferenceFiles, err := repositories.GetFiles(ctx, r.s3Client, id)
-	if err != nil {
-		return nil, gqlerror.Errorf(err.Error())
-	}
-
-	conferenceData.Files = conferenceFiles
 	return conferenceData, nil
 }
 
-func (r *queryResolver) IsParticipant(ctx context.Context, conferenceID string) (*bool, error) {
-	c, _ := auth.FromContext(ctx)
-
-	return services.IsConferenceParticipant(ctx, r.dbClient, c.Subject, conferenceID)
-}
-
-func (r *queryResolver) IsOrganizer(ctx context.Context, conferenceID string) (*bool, error) {
-	c, _ := auth.FromContext(ctx)
-
-	return services.IsConferenceOrganizer(ctx, r.dbClient, c.Subject, conferenceID)
+func (r *queryResolver) Conferences(ctx context.Context, page *models.Page, sort *models.Sort, filters *models.ConferencesFilters) (*models.ConferencesPage, error) {
+	si := auth.GetSessionInfo(ctx)
+	return services.GetAllConferences(ctx, r.dbClient, si.UserId, page, sort, filters)
 }
 
 func (r *Resolver) Conference() graph.ConferenceResolver { return &conferenceResolver{r} }
+
+func (r *Resolver) ConferencesPage() graph.ConferencesPageResolver {
+	return &conferencesPageResolver{r}
+}
 
 func (r *Resolver) Mutation() graph.MutationResolver { return &mutationResolver{r} }
 
 func (r *Resolver) Query() graph.QueryResolver { return &queryResolver{r} }
 
 type conferenceResolver struct{ *Resolver }
+type conferencesPageResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }

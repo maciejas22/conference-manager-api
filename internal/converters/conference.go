@@ -63,7 +63,7 @@ func ConvertConferenceRepoToSchema(c *repositories.Conference) *models.Conferenc
 	}
 }
 
-func ConvertConferenceFiltersSchemaToRepo(f *models.ConferenceFilter) *repositories.ConferenceFilter {
+func ConvertConferenceFiltersSchemaToRepo(f *models.ConferencesFilters) *repositories.ConferenceFilter {
 	if f == nil {
 		return nil
 	}

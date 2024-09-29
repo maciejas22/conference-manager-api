@@ -6,24 +6,161 @@ package resolvers
 
 import (
 	"context"
+	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/maciejas22/conference-manager/api/db"
+	"github.com/maciejas22/conference-manager/api/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/auth"
+	"github.com/maciejas22/conference-manager/api/internal/graph"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 	"github.com/maciejas22/conference-manager/api/internal/services"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
-func (r *mutationResolver) UpdateUser(ctx context.Context, updateUserInput models.UpdateUserInput) (*models.User, error) {
-	u, _ := auth.FromContext(ctx)
+func (r *mutationResolver) UpdateSession(ctx context.Context) (string, error) {
+	si := auth.GetSessionInfo(ctx)
+	newSessionId, err := auth.GenerateSessionId()
+	if err != nil {
+		return "", gqlerror.Errorf("Failed to generate new session")
+	}
+	expiresAt, err := time.Parse(time.RFC3339, si.ExpiresAt)
+	if err != nil {
+		return "", gqlerror.Errorf("Failed to parse session expiration time")
+	}
 
-	return services.UpdateUser(ctx, r.dbClient, u.Subject, updateUserInput)
+	if time.Now().Add(5 * time.Minute).Before(expiresAt) {
+		return si.SessionId, nil
+	}
+
+	var sessionId *string
+	err = db.Transaction(ctx, r.dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		sessionId, err = repositories.CreateSession(tx, newSessionId, si.UserId)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return "", gqlerror.Errorf("Failed to update session")
+	}
+
+	return *sessionId, nil
+}
+
+func (r *mutationResolver) LoginUser(ctx context.Context, loginUserInput models.LoginUserInput) (string, error) {
+	sessionId, err := services.LoginUser(ctx, r.dbClient, loginUserInput)
+	if err != nil {
+		return "", gqlerror.Errorf("Failed to login user")
+	}
+
+	return *sessionId, nil
+}
+
+func (r *mutationResolver) RegisterUser(ctx context.Context, registerUserInput models.RegisterUserInput) (string, error) {
+	sessionId, err := services.RegisterUser(ctx, r.dbClient, registerUserInput)
+	if err != nil {
+		return "", gqlerror.Errorf("Failed to register user")
+	}
+
+	return *sessionId, nil
+}
+
+func (r *mutationResolver) UpdateUser(ctx context.Context, updateUserInput models.UpdateUserInput) (int, error) {
+	si := auth.GetSessionInfo(ctx)
+
+	var u repositories.User
+	err := db.Transaction(ctx, r.dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		u, err = repositories.UpdateUser(tx, si.UserId, repositories.UpdateUserInput{
+			Username: &updateUserInput.Username,
+			Email:    &updateUserInput.Email,
+			Name:     &updateUserInput.Name,
+			Surname:  &updateUserInput.Surname,
+		})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return 0, gqlerror.Errorf("Failed to update user")
+	}
+
+	return u.Id, nil
+}
+
+func (r *mutationResolver) EditPassword(ctx context.Context, password string) (*bool, error) {
+	si := auth.GetSessionInfo(ctx)
+
+	err := db.Transaction(ctx, r.dbClient.Conn, func(tx *sqlx.Tx) error {
+		_, err := repositories.UpdateUser(tx, si.UserId, repositories.UpdateUserInput{
+			Password: &password,
+		})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, gqlerror.Errorf("Failed to update password")
+	}
+
+	result := true
+	return &result, nil
+}
+
+func (r *organizerMetricsResolver) NewParticipantsTrend(ctx context.Context, obj *models.OrganizerMetrics) ([]*models.NewParticipantsTrend, error) {
+	si := auth.GetSessionInfo(ctx)
+	newParticipantsTrend, err := services.GetParticipantsJoiningTrend(ctx, r.dbClient, si.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	return newParticipantsTrend, nil
 }
 
 func (r *queryResolver) User(ctx context.Context) (*models.User, error) {
-	u, ok := auth.FromContext(ctx)
-	if !ok {
-		return nil, gqlerror.Errorf("unauthorized user")
+	si := auth.GetSessionInfo(ctx)
+	return services.GetUserData(ctx, r.dbClient, si.UserId)
+}
+
+func (r *queryResolver) IsUserAssociatedWithConference(ctx context.Context, conferenceID int) (bool, error) {
+	si := auth.GetSessionInfo(ctx)
+
+	isParticipant, err := services.IsConferenceParticipant(ctx, r.dbClient, si.UserId, conferenceID)
+	if err != nil {
+		return false, err
 	}
 
-	return services.GetUserData(ctx, r.dbClient, u.Subject)
+	isOrganizer, err := services.IsConferenceOrganizer(ctx, r.dbClient, si.UserId, conferenceID)
+	if err != nil {
+		return false, err
+	}
+
+	return *isParticipant || *isOrganizer, nil
 }
+
+func (r *userResolver) Metrics(ctx context.Context, obj *models.User) (*models.OrganizerMetrics, error) {
+	si := auth.GetSessionInfo(ctx)
+
+	basicMetrics, err := services.GetOrganizerMetrics(ctx, r.dbClient, si.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	return basicMetrics, nil
+}
+
+func (r *Resolver) OrganizerMetrics() graph.OrganizerMetricsResolver {
+	return &organizerMetricsResolver{r}
+}
+
+func (r *Resolver) User() graph.UserResolver { return &userResolver{r} }
+
+type organizerMetricsResolver struct{ *Resolver }
+type userResolver struct{ *Resolver }

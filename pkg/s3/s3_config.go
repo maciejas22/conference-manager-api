@@ -15,7 +15,7 @@ func NewS3Session(logger *slog.Logger) (*s3.S3, error) {
 	sess, err := session.NewSession(&aws.Config{
 		Region:           aws.String(config.AppConfig.S3Region),
 		Endpoint:         aws.String(config.AppConfig.S3Endpoint),
-		Credentials:      credentials.NewStaticCredentials(config.AppConfig.S3AccessKeyID, config.AppConfig.S3SecretAccessKey, ""),
+		Credentials:      credentials.NewStaticCredentials(config.AppConfig.S3AccessKeyId, config.AppConfig.S3SecretAccessKey, ""),
 		S3ForcePathStyle: aws.Bool(true),
 	})
 

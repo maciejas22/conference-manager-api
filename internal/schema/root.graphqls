@@ -27,8 +27,7 @@ type PageInfo {
 }
 
 type File {
-  id: ID!
-  name: String!
+  key: String!
   url: String!
   size: Int!
 }
@@ -39,5 +38,5 @@ input UploadFile {
 }
 
 input DeleteFile {
-  id: ID!
+  key: String!
 }

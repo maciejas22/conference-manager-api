@@ -1,4 +1,4 @@
-input ConferenceFilter {
+input ConferencesFilters {
   associatedOnly: Boolean
   title: String
 }
@@ -20,9 +20,17 @@ type Conference {
   eventsCount: Int!
 }
 
-type ConferencePage {
+type ConferencesMetrics {
+  runningConferences: Int!
+  startingInLessThan24Hours: Int!
+  totalConducted: Int!
+  participantsToday: Int!
+}
+
+type ConferencesPage {
   data: [Conference!]!
   meta: ConferenceMeta!
+  metrics: ConferencesMetrics!
 }
 
 type ConferenceMeta {
@@ -37,11 +45,15 @@ type AgendaItem {
   speaker: String!
 }
 
-input CreateAgendaItemInput {
+input AgendaItemInput {
   startTime: Time!
   endTime: Time!
   event: String!
   speaker: String!
+}
+
+input CreateAgendaItemInput {
+  createItem: AgendaItemInput
 }
 
 input CreateConferenceInputFile {
@@ -63,12 +75,8 @@ input CreateConferenceInput {
 }
 
 input ModifyAgendaItemInput {
-  id: ID
-  startTime: Time!
-  endTime: Time!
-  event: String!
-  speaker: String!
-  _destroy: Boolean
+  createItem: AgendaItemInput
+  deleteItem: ID
 }
 
 input ModifyConferenceInputFile {
@@ -91,57 +99,19 @@ input ModifyConferenceInput {
   files: [ModifyConferenceInputFile!]
 }
 
-type ConferencesMetrics {
-  runningConferences: Int!
-  startingInLessThan24Hours: Int!
-  totalConducted: Int!
-  participantsToday: Int!
-}
-
-type OrganizerMetrics {
-  runningConferences: Int!
-  participantsCount: Int!
-  averageParticipantsCount: Float!
-  totalOrganizedConferences: Int!
-}
-
-enum Granularity {
-  Daily
-  Weekly
-  Monthly
-}
-
-type ChartTrend {
-  date: Time!
-  count: Int!
-}
-
-type ParticipantsJoiningTrend {
-  trend: [ChartTrend!]!
-  granularity: Granularity!
-}
-
 extend type Query {
+  conference(id: ID!): Conference! @authenticated
   conferences(
     page: Page
     sort: Sort
-    filters: ConferenceFilter
-  ): ConferencePage @authenticated
-  organizerMetrics: OrganizerMetrics @authenticated
-  participantsJoiningTrend: ParticipantsJoiningTrend @hasRole(role: Organizer)
-  conferencesMetrics: ConferencesMetrics @authenticated
-  conference(id: ID!): Conference @authenticated
-  isParticipant(conferenceId: ID!): Boolean @hasRole(role: Participant)
-  isOrganizer(conferenceId: ID!): Boolean @hasRole(role: Organizer)
+    filters: ConferencesFilters
+  ): ConferencesPage! @authenticated
 }
 
 extend type Mutation {
-  createConference(createConferenceInput: CreateConferenceInput!): Conference!
+  createConference(createConferenceInput: CreateConferenceInput!): ID!
     @hasRole(role: Organizer)
-  modifyConference(input: ModifyConferenceInput!): Conference!
-    @hasRole(role: Organizer)
-  addUserToConference(conferenceId: String!): Conference!
-    @hasRole(role: Participant)
-  removeUserFromConference(conferenceId: String!): Conference!
-    @hasRole(role: Participant)
+  modifyConference(input: ModifyConferenceInput!): ID! @hasRole(role: Organizer)
+  addUserToConference(conferenceId: ID!): ID! @hasRole(role: Participant)
+  removeUserFromConference(conferenceId: ID!): ID! @hasRole(role: Participant)
 }

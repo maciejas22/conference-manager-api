@@ -2,48 +2,65 @@ package services
 
 import (
 	"context"
+	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
-	"github.com/maciejas22/conference-manager/api/internal/converters"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 )
 
-func GetConferenceAgenda(ctx context.Context, db *db.DB, conferenceId string) ([]*models.AgendaItem, error) {
-	tx, err := db.Conn.BeginTxx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
+func GetConferenceAgenda(ctx context.Context, dbClient *db.DB, conferenceId int) ([]*models.AgendaItem, error) {
+	var agenda []repositories.AgendaItem
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		agenda, err = repositories.GetAgenda(tx, conferenceId)
+		if err != nil {
+			return err
+		}
 
-	agenda, err := repositories.GetAgenda(tx, conferenceId)
+		return nil
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, err
+		return []*models.AgendaItem{}, err
 	}
 
 	var agendaItems []*models.AgendaItem
 	for _, a := range agenda {
-		agendaItems = append(agendaItems, converters.ConvertAgendaItemRepoToSchema(&a))
+		startTime, err := time.Parse(time.RFC3339, a.StartTime)
+		if err != nil {
+			return []*models.AgendaItem{}, err
+		}
+
+		endTime, err := time.Parse(time.RFC3339, a.EndTime)
+		if err != nil {
+			return []*models.AgendaItem{}, err
+		}
+
+		agendaItems = append(agendaItems, &models.AgendaItem{
+			ID:        a.Id,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Event:     a.Event,
+			Speaker:   a.Speaker,
+		})
 	}
 
-	return agendaItems, nil
+	return agendaItems, err
 }
 
-func GetAgendaItemsCount(ctx context.Context, db *db.DB, conferenceId string) (int, error) {
-	tx, err := db.Conn.BeginTxx(ctx, nil)
-	if err != nil {
-		return 0, err
-	}
+func GetAgendaItemsCount(ctx context.Context, dbClient *db.DB, conferenceId int) (int, error) {
+	var agendaItemsCount int
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		agendaItemsCount, err = repositories.CountAgendaItems(tx, conferenceId)
+		if err != nil {
+			return err
+		}
 
-	agendaItemsCount, err := repositories.CountAgendaItems(tx, conferenceId)
+		return nil
+	})
 	if err != nil {
-		return 0, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
 

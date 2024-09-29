@@ -1,16 +1,19 @@
 package repositories
 
-import "github.com/jmoiron/sqlx"
+import (
+	"github.com/jmoiron/sqlx"
+)
 
 type TermsOfService struct {
-	Id              string `json:"id" db:"id"`
+	Id              int    `json:"id" db:"id"`
+	CreatedAt       string `json:"created_at"     db:"created_at"`
 	UpdatedAt       string `json:"updated_at"     db:"updated_at"`
 	Introduction    string `json:"introduction"  db:"introduction"`
 	Acknowledgement string `json:"acknowledgement" db:"acknowledgement"`
 }
 
 func (t *TermsOfService) TableName() string {
-	return "public.terms_of_service"
+	return "terms_of_service"
 }
 
 func GetTermsOfService(tx *sqlx.Tx) (TermsOfService, error) {

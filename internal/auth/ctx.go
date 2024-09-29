@@ -2,23 +2,24 @@ package auth
 
 import (
 	"context"
+
+	"github.com/maciejas22/conference-manager/api/db/repositories"
 )
 
-var userCtxKey = ctxKey{"user"}
-
-type ctxKey struct {
-	keyName string
+type SessionInfo struct {
+	SessionId string
+	ExpiresAt string
+	UserId    int
+	Role      repositories.Role
 }
 
-func NewContext(ctx context.Context, claims *TokenClaims) context.Context {
-	return context.WithValue(ctx, userCtxKey, claims)
-}
+type contextKey string
 
-func FromContext(ctx context.Context) (*TokenClaims, bool) {
-	claims, ok := ctx.Value(userCtxKey).(*TokenClaims)
-	if !ok {
-		return &TokenClaims{}, false
+const SessionInfoKey contextKey = "sessionInfo"
+
+func GetSessionInfo(ctx context.Context) *SessionInfo {
+	if sessionInfo, ok := ctx.Value(SessionInfoKey).(*SessionInfo); ok {
+		return sessionInfo
 	}
-
-	return claims, true
+	return nil
 }

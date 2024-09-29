@@ -3,7 +3,6 @@ package repositories
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -11,7 +10,7 @@ import (
 )
 
 type Conference struct {
-	Id                   string  `json:"id" db:"id"`
+	Id                   int     `json:"id" db:"id"`
 	Title                string  `json:"title" db:"title"`
 	StartDate            string  `json:"start_date" db:"start_date"`
 	EndDate              string  `json:"end_date" db:"end_date"`
@@ -21,10 +20,12 @@ type Conference struct {
 	AdditionalInfo       *string `json:"additional_info,omitempty" db:"additional_info"`
 	ParticipantsLimit    *int    `json:"participants_limit,omitempty" db:"participants_limit"`
 	RegistrationDeadline *string `json:"registration_deadline,omitempty" db:"registration_deadline"`
+	CreatedAt            string  `json:"created_at" db:"created_at"`
+	UpdatedAt            string  `json:"updated_at" db:"updated_at"`
 }
 
 func (c *Conference) TableName() string {
-	return "public.conferences"
+	return "conferences"
 }
 
 type ConferenceFilter struct {
@@ -32,7 +33,7 @@ type ConferenceFilter struct {
 	AssociatedOnly *bool   `json:"associatedOnly,omitempty"`
 }
 
-func GetConference(tx *sqlx.Tx, conferenceId string) (Conference, error) {
+func GetConference(tx *sqlx.Tx, conferenceId int) (Conference, error) {
 	var conference Conference
 	query := "SELECT id, title, start_date, end_date, location, additional_info, acronym, website, participants_limit, registration_deadline FROM " + conference.TableName() + " WHERE id = $1"
 	err := tx.Get(
@@ -46,7 +47,7 @@ func GetConference(tx *sqlx.Tx, conferenceId string) (Conference, error) {
 	return conference, nil
 }
 
-func GetAllConferences(tx *sqlx.Tx, userId string, p filters.Page, s *filters.Sort, f *ConferenceFilter) ([]Conference, filters.PaginationMeta, error) {
+func GetAllConferences(tx *sqlx.Tx, userId int, p filters.Page, s *filters.Sort, f *ConferenceFilter) ([]Conference, filters.PaginationMeta, error) {
 	var conferences []Conference
 	var totalItems int
 	c := &Conference{}
@@ -56,19 +57,16 @@ func GetAllConferences(tx *sqlx.Tx, userId string, p filters.Page, s *filters.So
 
 	whereClause := " WHERE 1=1"
 	queryArgs := []interface{}{}
-	argCounter := 1
 
-	if f.Title != nil {
-		whereClause += fmt.Sprintf(" AND title LIKE $%d", argCounter)
+	if f != nil && f.Title != nil {
+		whereClause += fmt.Sprintf(" AND title LIKE $%d", len(queryArgs)+1)
 		queryArgs = append(queryArgs, "%"+*f.Title+"%")
-		argCounter++
 	}
 
-	if f.AssociatedOnly != nil && *f.AssociatedOnly {
+	if f != nil && f.AssociatedOnly != nil && *f.AssociatedOnly {
 		whereClause += fmt.Sprintf(" AND id IN (SELECT conference_id FROM %s WHERE user_id = $%d UNION SELECT conference_id FROM %s WHERE user_id = $%d)",
-			(new(ConferenceParticipant)).TableName(), argCounter, (new(ConferenceOrganizer)).TableName(), argCounter+1)
+			(new(ConferenceParticipant)).TableName(), len(queryArgs)+1, (new(ConferenceOrganizer)).TableName(), len(queryArgs)+2)
 		queryArgs = append(queryArgs, userId, userId)
-		argCounter += 2
 	}
 
 	query += whereClause
@@ -79,7 +77,7 @@ func GetAllConferences(tx *sqlx.Tx, userId string, p filters.Page, s *filters.So
 	}
 
 	offset := (p.PageNumber - 1) * p.PageSize
-	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argCounter, argCounter+1)
+	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(queryArgs)+1, len(queryArgs)+2)
 	queryArgs = append(queryArgs, p.PageSize, offset)
 
 	err := tx.Get(&totalItems, countQuery, queryArgs[:len(queryArgs)-2]...)
@@ -103,10 +101,10 @@ func GetAllConferences(tx *sqlx.Tx, userId string, p filters.Page, s *filters.So
 	return conferences, paginationMeta, nil
 }
 
-func CreateConference(tx *sqlx.Tx, conference Conference, organizerId string) (Conference, error) {
-	query := "INSERT INTO " + conference.TableName() + " (title, start_date, end_date, location, website, acronym, additional_info, participants_limit, registration_deadline) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id"
-	err := tx.Get(&conference.Id,
-		query,
+func CreateConference(tx *sqlx.Tx, conference Conference, organizerId int) (int, error) {
+	query := "INSERT INTO " + conference.TableName() + " (title, start_date, end_date, location, website, acronym, additional_info, participants_limit, registration_deadline) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id"
+	var conferenceId int
+	err := tx.QueryRowx(query,
 		conference.Title,
 		conference.StartDate,
 		conference.EndDate,
@@ -116,20 +114,20 @@ func CreateConference(tx *sqlx.Tx, conference Conference, organizerId string) (C
 		conference.AdditionalInfo,
 		conference.ParticipantsLimit,
 		conference.RegistrationDeadline,
-	)
+	).Scan(&conferenceId)
 	if err != nil {
-		return Conference{}, err
+		return 0, err
 	}
 
-	_, err = AddConferenceOrganizer(tx, conference.Id, organizerId)
+	_, err = AddConferenceOrganizer(tx, conferenceId, organizerId)
 	if err != nil {
-		log.Println("Error adding organizer: ", err)
-		return Conference{}, errors.New("could not add organizer")
+		return 0, errors.New("could not add organizer")
 	}
-	return conference, nil
+
+	return conferenceId, nil
 }
 
-func UpdateConference(tx *sqlx.Tx, conference Conference) (Conference, error) {
+func UpdateConference(tx *sqlx.Tx, conference Conference) (int, error) {
 	query := "UPDATE " + conference.TableName() + " SET title = $1, start_date = $2, end_date = $3, location = $4, website = $5, acronym = $6, additional_info = $7, participants_limit = $8, registration_deadline = $9 WHERE id = $10"
 	_, err := tx.Exec(
 		query,
@@ -145,10 +143,9 @@ func UpdateConference(tx *sqlx.Tx, conference Conference) (Conference, error) {
 		conference.Id,
 	)
 	if err != nil {
-		log.Println("Error updating conference: ", err)
-		return Conference{}, err
+		return 0, err
 	}
-	return conference, nil
+	return conference.Id, nil
 }
 
 type ConferencesMetrics struct {
@@ -165,7 +162,7 @@ func GetMetrics(tx *sqlx.Tx) (ConferencesMetrics, error) {
 	now := time.Now()
 	tomorrow := now.Add(24 * time.Hour)
 
-	err := tx.Get(&metrics.RunningConferences, "SELECT COUNT(*) FROM "+conference.TableName()+" WHERE start_date <= $1 AND end_date >= $1", now)
+	err := tx.Get(&metrics.RunningConferences, "SELECT COUNT(*) FROM "+conference.TableName()+" WHERE start_date <= $1 AND end_date >= $2", now, now)
 	if err != nil {
 		return ConferencesMetrics{}, err
 	}
@@ -181,7 +178,7 @@ func GetMetrics(tx *sqlx.Tx) (ConferencesMetrics, error) {
 	}
 
 	var conferenceParticipant ConferenceParticipant
-	err = tx.Get(&metrics.ParticipantsToday, "SELECT COUNT(DISTINCT user_id) FROM "+conferenceParticipant.TableName()+" cp JOIN "+conference.TableName()+" c ON cp.conference_id = c.id WHERE c.start_date <= $1 AND c.end_date >= $1", now)
+	err = tx.Get(&metrics.ParticipantsToday, "SELECT COUNT(DISTINCT user_id) FROM "+conferenceParticipant.TableName()+" cp JOIN "+conference.TableName()+" c ON cp.conference_id = c.id WHERE c.start_date <= $1 AND c.end_date >= $2", now, now)
 	if err != nil {
 		return ConferencesMetrics{}, err
 	}

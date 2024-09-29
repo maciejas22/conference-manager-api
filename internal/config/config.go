@@ -11,11 +11,10 @@ type Config struct {
 	GoEnv                    string   `mapstructure:"GO_ENV"`
 	ServerPort               string   `mapstructure:"SERVER_PORT"`
 	CorsAllowedOrigins       []string `mapstructure:"CORS_ALLOWED_ORIGINS"`
-	JWTSecret                string   `mapstructure:"JWT_SECRET"`
 	DatabaseURL              string   `mapstructure:"DATABASE_URL"`
 	S3Region                 string   `mapstructure:"S3_REGION"`
 	S3Endpoint               string   `mapstructure:"S3_ENDPOINT"`
-	S3AccessKeyID            string   `mapstructure:"S3_ACCESS_KEY_ID"`
+	S3AccessKeyId            string   `mapstructure:"S3_ACCESS_KEY_ID"`
 	S3SecretAccessKey        string   `mapstructure:"S3_SECRET_ACCESS_KEY"`
 	S3UrlLifetimeInHours     int      `mapstructure:"S3_URL_LIFETIME_IN_HOURS"`
 	S3BucketsConferenceFiles string   `mapstructure:"S3_BUCKETS_CONFERENCE_FILES"`
