@@ -7,34 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/auth"
 )
 
-type authResponseWriter struct {
-	http.ResponseWriter
-	sessionInfo *auth.SessionInfo
-}
-
 const (
 	SessionCookieKey = "session"
 )
-
-func (w *authResponseWriter) Write(b []byte) (int, error) {
-	if w.sessionInfo.SessionId == "" {
-		return w.ResponseWriter.Write(b)
-	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookieKey,
-		Value:    w.sessionInfo.SessionId,
-		HttpOnly: true,
-		Expires:  time.Now().Add(1 * time.Hour),
-		SameSite: http.SameSiteLaxMode,
-	})
-	return w.ResponseWriter.Write(b)
-}
 
 func getSessionIdFromHeader(r *http.Request) (string, error) {
 	authHeader := r.Header.Get("Authorization")
@@ -50,80 +31,69 @@ func getSessionIdFromHeader(r *http.Request) (string, error) {
 	return sessionId, nil
 }
 
-func verifySession(ctx context.Context, dbClient *db.DB, sessionId string) error {
-	err := db.Transaction(ctx, dbClient.QueryExecutor, func(qe *db.QueryExecutor) error {
-		session, err := repositories.GetSession(qe, sessionId)
+func verifySession(dbClient *db.DB, sessionId string) (*repositories.Session, error) {
+	var session *repositories.Session
+	err := db.Transaction(context.Background(), dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		session, err = repositories.GetSession(tx, sessionId)
 		if err != nil {
-			return errors.New("could not get session")
-		}
-
-		sessionExpiresAt, err := time.Parse(time.RFC3339, session.ExpiresAt)
-		if err != nil {
-			return errors.New("could not parse session expiration time")
-		}
-
-		if time.Now().After(sessionExpiresAt) {
-			return errors.New("session expired")
+			return err
 		}
 
 		return nil
 	})
 	if err != nil {
-		return err
+		return nil, errors.New("could not get session")
 	}
 
-	return nil
+	sessionExpiresAt, err := time.Parse(time.RFC3339, session.ExpiresAt)
+	if err != nil {
+		return nil, errors.New("could not parse session expiration time")
+	}
+
+	if time.Now().After(sessionExpiresAt) {
+		return nil, errors.New("session expired")
+	}
+
+	return session, nil
 }
 
 func AuthMiddleware(dbClient *db.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			sessionInfo := &auth.SessionInfo{}
-			arw := &authResponseWriter{
-				ResponseWriter: w,
-				sessionInfo:    sessionInfo,
-			}
 			ctx := context.WithValue(r.Context(), auth.SessionInfoKey, sessionInfo)
 
 			sessionId, err := getSessionIdFromHeader(r)
 			if err != nil {
-				next.ServeHTTP(arw, r.WithContext(ctx))
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
-			err = verifySession(ctx, dbClient, sessionId)
+			session, err := verifySession(dbClient, sessionId)
 			if err != nil {
-				next.ServeHTTP(arw, r.WithContext(ctx))
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
-			arw.sessionInfo.SessionId = sessionId
+			sessionInfo.SessionId = sessionId
+			sessionInfo.ExpiresAt = session.ExpiresAt
 
-			err = db.Transaction(ctx, dbClient.QueryExecutor, func(qe *db.QueryExecutor) error {
-				user, err := repositories.GetUserBySessionId(qe, sessionId)
+			err = db.Transaction(context.Background(), dbClient.Conn, func(tx *sqlx.Tx) error {
+				user, err := repositories.GetUserBySessionId(tx, sessionId)
 				if err != nil {
-					newSessionId, err := auth.GenerateSessionId()
-					if err != nil {
-						return err
-					}
-
-					userSession, err := repositories.CreateSession(qe, newSessionId, user.Id)
-					if err != nil {
-						return err
-					}
-
-					arw.sessionInfo.SessionId = *userSession
-				} else {
-					arw.sessionInfo.UserID = user.Id
-					arw.sessionInfo.Role = user.Role
+					return err
 				}
-				return err
-			})
 
+				sessionInfo.UserId = user.Id
+				sessionInfo.Role = user.Role
+
+				return nil
+			})
 			if err != nil {
-				next.ServeHTTP(arw, r.WithContext(ctx))
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
-			next.ServeHTTP(arw, r.WithContext(ctx))
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }

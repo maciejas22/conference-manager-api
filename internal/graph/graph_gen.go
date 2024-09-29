@@ -40,10 +40,13 @@ type Config struct {
 
 type ResolverRoot interface {
 	Conference() ConferenceResolver
+	ConferencesPage() ConferencesPageResolver
 	Mutation() MutationResolver
+	OrganizerMetrics() OrganizerMetricsResolver
 	Query() QueryResolver
 	Section() SectionResolver
 	TermsOfService() TermsOfServiceResolver
+	User() UserResolver
 }
 
 type DirectiveRoot struct {
@@ -58,11 +61,6 @@ type ComplexityRoot struct {
 		ID        func(childComplexity int) int
 		Speaker   func(childComplexity int) int
 		StartTime func(childComplexity int) int
-	}
-
-	ChartTrend struct {
-		Count func(childComplexity int) int
-		Date  func(childComplexity int) int
 	}
 
 	Conference struct {
@@ -86,11 +84,6 @@ type ComplexityRoot struct {
 		Page func(childComplexity int) int
 	}
 
-	ConferencePage struct {
-		Data func(childComplexity int) int
-		Meta func(childComplexity int) int
-	}
-
 	ConferencesMetrics struct {
 		ParticipantsToday         func(childComplexity int) int
 		RunningConferences        func(childComplexity int) int
@@ -98,9 +91,14 @@ type ComplexityRoot struct {
 		TotalConducted            func(childComplexity int) int
 	}
 
+	ConferencesPage struct {
+		Data    func(childComplexity int) int
+		Meta    func(childComplexity int) int
+		Metrics func(childComplexity int) int
+	}
+
 	File struct {
-		ID   func(childComplexity int) int
-		Name func(childComplexity int) int
+		Key  func(childComplexity int) int
 		Size func(childComplexity int) int
 		URL  func(childComplexity int) int
 	}
@@ -108,11 +106,18 @@ type ComplexityRoot struct {
 	Mutation struct {
 		AddUserToConference      func(childComplexity int, conferenceID int) int
 		CreateConference         func(childComplexity int, createConferenceInput models.CreateConferenceInput) int
+		EditPassword             func(childComplexity int, password string) int
 		LoginUser                func(childComplexity int, loginUserInput models.LoginUserInput) int
 		ModifyConference         func(childComplexity int, input models.ModifyConferenceInput) int
 		RegisterUser             func(childComplexity int, registerUserInput models.RegisterUserInput) int
 		RemoveUserFromConference func(childComplexity int, conferenceID int) int
+		UpdateSession            func(childComplexity int) int
 		UpdateUser               func(childComplexity int, updateUserInput models.UpdateUserInput) int
+	}
+
+	NewParticipantsTrend struct {
+		Date            func(childComplexity int) int
+		NewParticipants func(childComplexity int) int
 	}
 
 	News struct {
@@ -124,6 +129,7 @@ type ComplexityRoot struct {
 
 	OrganizerMetrics struct {
 		AverageParticipantsCount  func(childComplexity int) int
+		NewParticipantsTrend      func(childComplexity int) int
 		ParticipantsCount         func(childComplexity int) int
 		RunningConferences        func(childComplexity int) int
 		TotalOrganizedConferences func(childComplexity int) int
@@ -136,22 +142,13 @@ type ComplexityRoot struct {
 		TotalPages func(childComplexity int) int
 	}
 
-	ParticipantsJoiningTrend struct {
-		Granularity func(childComplexity int) int
-		Trend       func(childComplexity int) int
-	}
-
 	Query struct {
-		Conference               func(childComplexity int, id int) int
-		Conferences              func(childComplexity int, page *models.Page, sort *models.Sort, filters *models.ConferenceFilter) int
-		ConferencesMetrics       func(childComplexity int) int
-		IsOrganizer              func(childComplexity int, conferenceID int) int
-		IsParticipant            func(childComplexity int, conferenceID int) int
-		News                     func(childComplexity int) int
-		OrganizerMetrics         func(childComplexity int) int
-		ParticipantsJoiningTrend func(childComplexity int) int
-		TermsAndConditions       func(childComplexity int) int
-		User                     func(childComplexity int) int
+		Conference                     func(childComplexity int, id int) int
+		Conferences                    func(childComplexity int, page *models.Page, sort *models.Sort, filters *models.ConferencesFilters) int
+		IsUserAssociatedWithConference func(childComplexity int, conferenceID int) int
+		News                           func(childComplexity int) int
+		TermsAndConditions             func(childComplexity int) int
+		User                           func(childComplexity int) int
 	}
 
 	Section struct {
@@ -178,6 +175,7 @@ type ComplexityRoot struct {
 	User struct {
 		Email    func(childComplexity int) int
 		ID       func(childComplexity int) int
+		Metrics  func(childComplexity int) int
 		Name     func(childComplexity int) int
 		Role     func(childComplexity int) int
 		Surname  func(childComplexity int) int
@@ -189,34 +187,42 @@ type ConferenceResolver interface {
 	Agenda(ctx context.Context, obj *models.Conference) ([]*models.AgendaItem, error)
 	ParticipantsCount(ctx context.Context, obj *models.Conference) (int, error)
 
+	Files(ctx context.Context, obj *models.Conference) ([]*models.File, error)
 	EventsCount(ctx context.Context, obj *models.Conference) (int, error)
 }
+type ConferencesPageResolver interface {
+	Metrics(ctx context.Context, obj *models.ConferencesPage) (*models.ConferencesMetrics, error)
+}
 type MutationResolver interface {
-	CreateConference(ctx context.Context, createConferenceInput models.CreateConferenceInput) (*int, error)
-	ModifyConference(ctx context.Context, input models.ModifyConferenceInput) (*int, error)
-	AddUserToConference(ctx context.Context, conferenceID int) (*int, error)
-	RemoveUserFromConference(ctx context.Context, conferenceID int) (*int, error)
-	LoginUser(ctx context.Context, loginUserInput models.LoginUserInput) (*string, error)
-	RegisterUser(ctx context.Context, registerUserInput models.RegisterUserInput) (*string, error)
-	UpdateUser(ctx context.Context, updateUserInput models.UpdateUserInput) (*models.User, error)
+	CreateConference(ctx context.Context, createConferenceInput models.CreateConferenceInput) (int, error)
+	ModifyConference(ctx context.Context, input models.ModifyConferenceInput) (int, error)
+	AddUserToConference(ctx context.Context, conferenceID int) (int, error)
+	RemoveUserFromConference(ctx context.Context, conferenceID int) (int, error)
+	UpdateSession(ctx context.Context) (string, error)
+	LoginUser(ctx context.Context, loginUserInput models.LoginUserInput) (string, error)
+	RegisterUser(ctx context.Context, registerUserInput models.RegisterUserInput) (string, error)
+	UpdateUser(ctx context.Context, updateUserInput models.UpdateUserInput) (int, error)
+	EditPassword(ctx context.Context, password string) (*bool, error)
+}
+type OrganizerMetricsResolver interface {
+	NewParticipantsTrend(ctx context.Context, obj *models.OrganizerMetrics) ([]*models.NewParticipantsTrend, error)
 }
 type QueryResolver interface {
-	Conferences(ctx context.Context, page *models.Page, sort *models.Sort, filters *models.ConferenceFilter) (*models.ConferencePage, error)
-	OrganizerMetrics(ctx context.Context) (*models.OrganizerMetrics, error)
-	ParticipantsJoiningTrend(ctx context.Context) (*models.ParticipantsJoiningTrend, error)
-	ConferencesMetrics(ctx context.Context) (*models.ConferencesMetrics, error)
 	Conference(ctx context.Context, id int) (*models.Conference, error)
-	IsParticipant(ctx context.Context, conferenceID int) (*bool, error)
-	IsOrganizer(ctx context.Context, conferenceID int) (*bool, error)
+	Conferences(ctx context.Context, page *models.Page, sort *models.Sort, filters *models.ConferencesFilters) (*models.ConferencesPage, error)
 	News(ctx context.Context) ([]*models.News, error)
 	TermsAndConditions(ctx context.Context) (*models.TermsOfService, error)
 	User(ctx context.Context) (*models.User, error)
+	IsUserAssociatedWithConference(ctx context.Context, conferenceID int) (bool, error)
 }
 type SectionResolver interface {
 	Subsections(ctx context.Context, obj *models.Section) ([]*models.SubSection, error)
 }
 type TermsOfServiceResolver interface {
 	Sections(ctx context.Context, obj *models.TermsOfService) ([]*models.Section, error)
+}
+type UserResolver interface {
+	Metrics(ctx context.Context, obj *models.User) (*models.OrganizerMetrics, error)
 }
 
 type executableSchema struct {
@@ -272,20 +278,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.AgendaItem.StartTime(childComplexity), true
-
-	case "ChartTrend.count":
-		if e.complexity.ChartTrend.Count == nil {
-			break
-		}
-
-		return e.complexity.ChartTrend.Count(childComplexity), true
-
-	case "ChartTrend.date":
-		if e.complexity.ChartTrend.Date == nil {
-			break
-		}
-
-		return e.complexity.ChartTrend.Date(childComplexity), true
 
 	case "Conference.acronym":
 		if e.complexity.Conference.Acronym == nil {
@@ -392,20 +384,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ConferenceMeta.Page(childComplexity), true
 
-	case "ConferencePage.data":
-		if e.complexity.ConferencePage.Data == nil {
-			break
-		}
-
-		return e.complexity.ConferencePage.Data(childComplexity), true
-
-	case "ConferencePage.meta":
-		if e.complexity.ConferencePage.Meta == nil {
-			break
-		}
-
-		return e.complexity.ConferencePage.Meta(childComplexity), true
-
 	case "ConferencesMetrics.participantsToday":
 		if e.complexity.ConferencesMetrics.ParticipantsToday == nil {
 			break
@@ -434,19 +412,33 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ConferencesMetrics.TotalConducted(childComplexity), true
 
-	case "File.id":
-		if e.complexity.File.ID == nil {
+	case "ConferencesPage.data":
+		if e.complexity.ConferencesPage.Data == nil {
 			break
 		}
 
-		return e.complexity.File.ID(childComplexity), true
+		return e.complexity.ConferencesPage.Data(childComplexity), true
 
-	case "File.name":
-		if e.complexity.File.Name == nil {
+	case "ConferencesPage.meta":
+		if e.complexity.ConferencesPage.Meta == nil {
 			break
 		}
 
-		return e.complexity.File.Name(childComplexity), true
+		return e.complexity.ConferencesPage.Meta(childComplexity), true
+
+	case "ConferencesPage.metrics":
+		if e.complexity.ConferencesPage.Metrics == nil {
+			break
+		}
+
+		return e.complexity.ConferencesPage.Metrics(childComplexity), true
+
+	case "File.key":
+		if e.complexity.File.Key == nil {
+			break
+		}
+
+		return e.complexity.File.Key(childComplexity), true
 
 	case "File.size":
 		if e.complexity.File.Size == nil {
@@ -485,6 +477,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.CreateConference(childComplexity, args["createConferenceInput"].(models.CreateConferenceInput)), true
+
+	case "Mutation.editPassword":
+		if e.complexity.Mutation.EditPassword == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_editPassword_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.EditPassword(childComplexity, args["password"].(string)), true
 
 	case "Mutation.loginUser":
 		if e.complexity.Mutation.LoginUser == nil {
@@ -534,6 +538,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.RemoveUserFromConference(childComplexity, args["conferenceId"].(int)), true
 
+	case "Mutation.updateSession":
+		if e.complexity.Mutation.UpdateSession == nil {
+			break
+		}
+
+		return e.complexity.Mutation.UpdateSession(childComplexity), true
+
 	case "Mutation.updateUser":
 		if e.complexity.Mutation.UpdateUser == nil {
 			break
@@ -545,6 +556,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.UpdateUser(childComplexity, args["updateUserInput"].(models.UpdateUserInput)), true
+
+	case "NewParticipantsTrend.date":
+		if e.complexity.NewParticipantsTrend.Date == nil {
+			break
+		}
+
+		return e.complexity.NewParticipantsTrend.Date(childComplexity), true
+
+	case "NewParticipantsTrend.newParticipants":
+		if e.complexity.NewParticipantsTrend.NewParticipants == nil {
+			break
+		}
+
+		return e.complexity.NewParticipantsTrend.NewParticipants(childComplexity), true
 
 	case "News.content":
 		if e.complexity.News.Content == nil {
@@ -580,6 +605,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.OrganizerMetrics.AverageParticipantsCount(childComplexity), true
+
+	case "OrganizerMetrics.newParticipantsTrend":
+		if e.complexity.OrganizerMetrics.NewParticipantsTrend == nil {
+			break
+		}
+
+		return e.complexity.OrganizerMetrics.NewParticipantsTrend(childComplexity), true
 
 	case "OrganizerMetrics.participantsCount":
 		if e.complexity.OrganizerMetrics.ParticipantsCount == nil {
@@ -630,20 +662,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PageInfo.TotalPages(childComplexity), true
 
-	case "ParticipantsJoiningTrend.granularity":
-		if e.complexity.ParticipantsJoiningTrend.Granularity == nil {
-			break
-		}
-
-		return e.complexity.ParticipantsJoiningTrend.Granularity(childComplexity), true
-
-	case "ParticipantsJoiningTrend.trend":
-		if e.complexity.ParticipantsJoiningTrend.Trend == nil {
-			break
-		}
-
-		return e.complexity.ParticipantsJoiningTrend.Trend(childComplexity), true
-
 	case "Query.conference":
 		if e.complexity.Query.Conference == nil {
 			break
@@ -666,38 +684,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Conferences(childComplexity, args["page"].(*models.Page), args["sort"].(*models.Sort), args["filters"].(*models.ConferenceFilter)), true
+		return e.complexity.Query.Conferences(childComplexity, args["page"].(*models.Page), args["sort"].(*models.Sort), args["filters"].(*models.ConferencesFilters)), true
 
-	case "Query.conferencesMetrics":
-		if e.complexity.Query.ConferencesMetrics == nil {
+	case "Query.isUserAssociatedWithConference":
+		if e.complexity.Query.IsUserAssociatedWithConference == nil {
 			break
 		}
 
-		return e.complexity.Query.ConferencesMetrics(childComplexity), true
-
-	case "Query.isOrganizer":
-		if e.complexity.Query.IsOrganizer == nil {
-			break
-		}
-
-		args, err := ec.field_Query_isOrganizer_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_isUserAssociatedWithConference_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Query.IsOrganizer(childComplexity, args["conferenceId"].(int)), true
-
-	case "Query.isParticipant":
-		if e.complexity.Query.IsParticipant == nil {
-			break
-		}
-
-		args, err := ec.field_Query_isParticipant_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.IsParticipant(childComplexity, args["conferenceId"].(int)), true
+		return e.complexity.Query.IsUserAssociatedWithConference(childComplexity, args["conferenceId"].(int)), true
 
 	case "Query.news":
 		if e.complexity.Query.News == nil {
@@ -705,20 +704,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.News(childComplexity), true
-
-	case "Query.organizerMetrics":
-		if e.complexity.Query.OrganizerMetrics == nil {
-			break
-		}
-
-		return e.complexity.Query.OrganizerMetrics(childComplexity), true
-
-	case "Query.participantsJoiningTrend":
-		if e.complexity.Query.ParticipantsJoiningTrend == nil {
-			break
-		}
-
-		return e.complexity.Query.ParticipantsJoiningTrend(childComplexity), true
 
 	case "Query.termsAndConditions":
 		if e.complexity.Query.TermsAndConditions == nil {
@@ -832,6 +817,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.User.ID(childComplexity), true
 
+	case "User.metrics":
+		if e.complexity.User.Metrics == nil {
+			break
+		}
+
+		return e.complexity.User.Metrics(childComplexity), true
+
 	case "User.name":
 		if e.complexity.User.Name == nil {
 			break
@@ -868,7 +860,8 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	rc := graphql.GetOperationContext(ctx)
 	ec := executionContext{rc, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
-		ec.unmarshalInputConferenceFilter,
+		ec.unmarshalInputAgendaItemInput,
+		ec.unmarshalInputConferencesFilters,
 		ec.unmarshalInputCreateAgendaItemInput,
 		ec.unmarshalInputCreateConferenceInput,
 		ec.unmarshalInputCreateConferenceInputFile,
@@ -979,7 +972,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "../schema/conference.graphqls", Input: `input ConferenceFilter {
+	{Name: "../schema/conference.graphqls", Input: `input ConferencesFilters {
   associatedOnly: Boolean
   title: String
 }
@@ -1001,9 +994,17 @@ type Conference {
   eventsCount: Int!
 }
 
-type ConferencePage {
+type ConferencesMetrics {
+  runningConferences: Int!
+  startingInLessThan24Hours: Int!
+  totalConducted: Int!
+  participantsToday: Int!
+}
+
+type ConferencesPage {
   data: [Conference!]!
   meta: ConferenceMeta!
+  metrics: ConferencesMetrics!
 }
 
 type ConferenceMeta {
@@ -1018,11 +1019,15 @@ type AgendaItem {
   speaker: String!
 }
 
-input CreateAgendaItemInput {
+input AgendaItemInput {
   startTime: Time!
   endTime: Time!
   event: String!
   speaker: String!
+}
+
+input CreateAgendaItemInput {
+  createItem: AgendaItemInput
 }
 
 input CreateConferenceInputFile {
@@ -1044,12 +1049,8 @@ input CreateConferenceInput {
 }
 
 input ModifyAgendaItemInput {
-  id: ID
-  startTime: Time!
-  endTime: Time!
-  event: String!
-  speaker: String!
-  _destroy: Boolean
+  createItem: AgendaItemInput
+  deleteItem: ID
 }
 
 input ModifyConferenceInputFile {
@@ -1072,56 +1073,21 @@ input ModifyConferenceInput {
   files: [ModifyConferenceInputFile!]
 }
 
-type ConferencesMetrics {
-  runningConferences: Int!
-  startingInLessThan24Hours: Int!
-  totalConducted: Int!
-  participantsToday: Int!
-}
-
-type OrganizerMetrics {
-  runningConferences: Int!
-  participantsCount: Int!
-  averageParticipantsCount: Float!
-  totalOrganizedConferences: Int!
-}
-
-enum Granularity {
-  Daily
-  Weekly
-  Monthly
-}
-
-type ChartTrend {
-  date: Time!
-  count: Int!
-}
-
-type ParticipantsJoiningTrend {
-  trend: [ChartTrend!]!
-  granularity: Granularity!
-}
-
 extend type Query {
+  conference(id: ID!): Conference! @authenticated
   conferences(
     page: Page
     sort: Sort
-    filters: ConferenceFilter
-  ): ConferencePage @authenticated
-  organizerMetrics: OrganizerMetrics @authenticated
-  participantsJoiningTrend: ParticipantsJoiningTrend @hasRole(role: Organizer)
-  conferencesMetrics: ConferencesMetrics @authenticated
-  conference(id: ID!): Conference @authenticated
-  isParticipant(conferenceId: ID!): Boolean @hasRole(role: Participant)
-  isOrganizer(conferenceId: ID!): Boolean @hasRole(role: Organizer)
+    filters: ConferencesFilters
+  ): ConferencesPage! @authenticated
 }
 
 extend type Mutation {
-  createConference(createConferenceInput: CreateConferenceInput!): ID
+  createConference(createConferenceInput: CreateConferenceInput!): ID!
     @hasRole(role: Organizer)
-  modifyConference(input: ModifyConferenceInput!): ID @hasRole(role: Organizer)
-  addUserToConference(conferenceId: ID!): ID @hasRole(role: Participant)
-  removeUserFromConference(conferenceId: ID!): ID @hasRole(role: Participant)
+  modifyConference(input: ModifyConferenceInput!): ID! @hasRole(role: Organizer)
+  addUserToConference(conferenceId: ID!): ID! @hasRole(role: Participant)
+  removeUserFromConference(conferenceId: ID!): ID! @hasRole(role: Participant)
 }
 `, BuiltIn: false},
 	{Name: "../schema/info.graphqls", Input: `type News {
@@ -1133,8 +1099,8 @@ extend type Mutation {
 
 type SubSection {
   id: ID!
-  title: String
-  content: String
+  title: String!
+  content: String!
 }
 
 type Section {
@@ -1186,8 +1152,7 @@ type PageInfo {
 }
 
 type File {
-  id: String!
-  name: String!
+  key: String!
   url: String!
   size: Int!
 }
@@ -1198,12 +1163,25 @@ input UploadFile {
 }
 
 input DeleteFile {
-  id: ID!
+  key: String!
 }
 `, BuiltIn: false},
 	{Name: "../schema/user.graphqls", Input: `enum Role {
   Organizer
   Participant
+}
+
+type NewParticipantsTrend {
+  date: Time!
+  newParticipants: Int!
+}
+
+type OrganizerMetrics {
+  runningConferences: Int!
+  participantsCount: Int!
+  averageParticipantsCount: Float!
+  totalOrganizedConferences: Int!
+  newParticipantsTrend: [NewParticipantsTrend!]!
 }
 
 type User {
@@ -1213,10 +1191,12 @@ type User {
   username: String
   email: String!
   role: Role!
+  metrics: OrganizerMetrics @hasRole(role: Organizer)
 }
 
 extend type Query {
   user: User @authenticated
+  isUserAssociatedWithConference(conferenceId: ID!): Boolean! @authenticated
 }
 
 input LoginUserInput {
@@ -1238,9 +1218,11 @@ input UpdateUserInput {
 }
 
 extend type Mutation {
-  loginUser(loginUserInput: LoginUserInput!): String
-  registerUser(registerUserInput: RegisterUserInput!): String
-  updateUser(updateUserInput: UpdateUserInput!): User @authenticated
+  updateSession: String! @authenticated
+  loginUser(loginUserInput: LoginUserInput!): String!
+  registerUser(registerUserInput: RegisterUserInput!): String!
+  updateUser(updateUserInput: UpdateUserInput!): ID! @authenticated
+  editPassword(password: String!): Boolean @authenticated
 }
 `, BuiltIn: false},
 }
@@ -1292,6 +1274,21 @@ func (ec *executionContext) field_Mutation_createConference_args(ctx context.Con
 		}
 	}
 	args["createConferenceInput"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_editPassword_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["password"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["password"] = arg0
 	return args, nil
 }
 
@@ -1421,10 +1418,10 @@ func (ec *executionContext) field_Query_conferences_args(ctx context.Context, ra
 		}
 	}
 	args["sort"] = arg1
-	var arg2 *models.ConferenceFilter
+	var arg2 *models.ConferencesFilters
 	if tmp, ok := rawArgs["filters"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("filters"))
-		arg2, err = ec.unmarshalOConferenceFilter2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferenceFilter(ctx, tmp)
+		arg2, err = ec.unmarshalOConferencesFilters2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencesFilters(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -1433,22 +1430,7 @@ func (ec *executionContext) field_Query_conferences_args(ctx context.Context, ra
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_isOrganizer_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 int
-	if tmp, ok := rawArgs["conferenceId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("conferenceId"))
-		arg0, err = ec.unmarshalNID2int(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["conferenceId"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_isParticipant_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Query_isUserAssociatedWithConference_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 int
@@ -1716,94 +1698,6 @@ func (ec *executionContext) fieldContext_AgendaItem_speaker(ctx context.Context,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ChartTrend_date(ctx context.Context, field graphql.CollectedField, obj *models.ChartTrend) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ChartTrend_date(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Date, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(time.Time)
-	fc.Result = res
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ChartTrend_date(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ChartTrend",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Time does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ChartTrend_count(ctx context.Context, field graphql.CollectedField, obj *models.ChartTrend) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ChartTrend_count(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Count, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(int)
-	fc.Result = res
-	return ec.marshalNInt2int(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ChartTrend_count(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ChartTrend",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -2348,7 +2242,7 @@ func (ec *executionContext) _Conference_files(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Files, nil
+		return ec.resolvers.Conference().Files(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2369,14 +2263,12 @@ func (ec *executionContext) fieldContext_Conference_files(ctx context.Context, f
 	fc = &graphql.FieldContext{
 		Object:     "Conference",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_File_id(ctx, field)
-			case "name":
-				return ec.fieldContext_File_name(ctx, field)
+			case "key":
+				return ec.fieldContext_File_key(ctx, field)
 			case "url":
 				return ec.fieldContext_File_url(ctx, field)
 			case "size":
@@ -2481,128 +2373,6 @@ func (ec *executionContext) fieldContext_ConferenceMeta_page(ctx context.Context
 				return ec.fieldContext_PageInfo_size(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ConferencePage_data(ctx context.Context, field graphql.CollectedField, obj *models.ConferencePage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ConferencePage_data(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Data, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.([]*models.Conference)
-	fc.Result = res
-	return ec.marshalNConference2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferenceᚄ(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ConferencePage_data(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ConferencePage",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Conference_id(ctx, field)
-			case "title":
-				return ec.fieldContext_Conference_title(ctx, field)
-			case "startDate":
-				return ec.fieldContext_Conference_startDate(ctx, field)
-			case "endDate":
-				return ec.fieldContext_Conference_endDate(ctx, field)
-			case "location":
-				return ec.fieldContext_Conference_location(ctx, field)
-			case "website":
-				return ec.fieldContext_Conference_website(ctx, field)
-			case "acronym":
-				return ec.fieldContext_Conference_acronym(ctx, field)
-			case "additionalInfo":
-				return ec.fieldContext_Conference_additionalInfo(ctx, field)
-			case "agenda":
-				return ec.fieldContext_Conference_agenda(ctx, field)
-			case "participantsCount":
-				return ec.fieldContext_Conference_participantsCount(ctx, field)
-			case "participantsLimit":
-				return ec.fieldContext_Conference_participantsLimit(ctx, field)
-			case "registrationDeadline":
-				return ec.fieldContext_Conference_registrationDeadline(ctx, field)
-			case "files":
-				return ec.fieldContext_Conference_files(ctx, field)
-			case "eventsCount":
-				return ec.fieldContext_Conference_eventsCount(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Conference", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ConferencePage_meta(ctx context.Context, field graphql.CollectedField, obj *models.ConferencePage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ConferencePage_meta(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Meta, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*models.ConferenceMeta)
-	fc.Result = res
-	return ec.marshalNConferenceMeta2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferenceMeta(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ConferencePage_meta(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ConferencePage",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "page":
-				return ec.fieldContext_ConferenceMeta_page(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ConferenceMeta", field.Name)
 		},
 	}
 	return fc, nil
@@ -2784,8 +2554,8 @@ func (ec *executionContext) fieldContext_ConferencesMetrics_participantsToday(ct
 	return fc, nil
 }
 
-func (ec *executionContext) _File_id(ctx context.Context, field graphql.CollectedField, obj *models.File) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_File_id(ctx, field)
+func (ec *executionContext) _ConferencesPage_data(ctx context.Context, field graphql.CollectedField, obj *models.ConferencesPage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConferencesPage_data(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -2798,7 +2568,7 @@ func (ec *executionContext) _File_id(ctx context.Context, field graphql.Collecte
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.Data, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2810,26 +2580,56 @@ func (ec *executionContext) _File_id(ctx context.Context, field graphql.Collecte
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.([]*models.Conference)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNConference2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferenceᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_File_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_ConferencesPage_data(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "File",
+		Object:     "ConferencesPage",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Conference_id(ctx, field)
+			case "title":
+				return ec.fieldContext_Conference_title(ctx, field)
+			case "startDate":
+				return ec.fieldContext_Conference_startDate(ctx, field)
+			case "endDate":
+				return ec.fieldContext_Conference_endDate(ctx, field)
+			case "location":
+				return ec.fieldContext_Conference_location(ctx, field)
+			case "website":
+				return ec.fieldContext_Conference_website(ctx, field)
+			case "acronym":
+				return ec.fieldContext_Conference_acronym(ctx, field)
+			case "additionalInfo":
+				return ec.fieldContext_Conference_additionalInfo(ctx, field)
+			case "agenda":
+				return ec.fieldContext_Conference_agenda(ctx, field)
+			case "participantsCount":
+				return ec.fieldContext_Conference_participantsCount(ctx, field)
+			case "participantsLimit":
+				return ec.fieldContext_Conference_participantsLimit(ctx, field)
+			case "registrationDeadline":
+				return ec.fieldContext_Conference_registrationDeadline(ctx, field)
+			case "files":
+				return ec.fieldContext_Conference_files(ctx, field)
+			case "eventsCount":
+				return ec.fieldContext_Conference_eventsCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Conference", field.Name)
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _File_name(ctx context.Context, field graphql.CollectedField, obj *models.File) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_File_name(ctx, field)
+func (ec *executionContext) _ConferencesPage_meta(ctx context.Context, field graphql.CollectedField, obj *models.ConferencesPage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConferencesPage_meta(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -2842,7 +2642,109 @@ func (ec *executionContext) _File_name(ctx context.Context, field graphql.Collec
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Name, nil
+		return obj.Meta, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.ConferenceMeta)
+	fc.Result = res
+	return ec.marshalNConferenceMeta2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferenceMeta(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ConferencesPage_meta(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConferencesPage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "page":
+				return ec.fieldContext_ConferenceMeta_page(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ConferenceMeta", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConferencesPage_metrics(ctx context.Context, field graphql.CollectedField, obj *models.ConferencesPage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConferencesPage_metrics(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.ConferencesPage().Metrics(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.ConferencesMetrics)
+	fc.Result = res
+	return ec.marshalNConferencesMetrics2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencesMetrics(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ConferencesPage_metrics(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConferencesPage",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "runningConferences":
+				return ec.fieldContext_ConferencesMetrics_runningConferences(ctx, field)
+			case "startingInLessThan24Hours":
+				return ec.fieldContext_ConferencesMetrics_startingInLessThan24Hours(ctx, field)
+			case "totalConducted":
+				return ec.fieldContext_ConferencesMetrics_totalConducted(ctx, field)
+			case "participantsToday":
+				return ec.fieldContext_ConferencesMetrics_participantsToday(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ConferencesMetrics", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _File_key(ctx context.Context, field graphql.CollectedField, obj *models.File) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_File_key(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Key, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2859,7 +2761,7 @@ func (ec *executionContext) _File_name(ctx context.Context, field graphql.Collec
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_File_name(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_File_key(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "File",
 		Field:      field,
@@ -2942,9 +2844,9 @@ func (ec *executionContext) _File_size(ctx context.Context, field graphql.Collec
 		}
 		return graphql.Null
 	}
-	res := resTmp.(int64)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNInt2int64(ctx, field.Selections, res)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_File_size(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2995,21 +2897,24 @@ func (ec *executionContext) _Mutation_createConference(ctx context.Context, fiel
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*int); ok {
+		if data, ok := tmp.(int); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *int`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be int`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*int)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalOID2ᚖint(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_createConference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3071,21 +2976,24 @@ func (ec *executionContext) _Mutation_modifyConference(ctx context.Context, fiel
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*int); ok {
+		if data, ok := tmp.(int); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *int`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be int`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*int)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalOID2ᚖint(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_modifyConference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3147,21 +3055,24 @@ func (ec *executionContext) _Mutation_addUserToConference(ctx context.Context, f
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*int); ok {
+		if data, ok := tmp.(int); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *int`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be int`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*int)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalOID2ᚖint(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_addUserToConference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3223,21 +3134,24 @@ func (ec *executionContext) _Mutation_removeUserFromConference(ctx context.Conte
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*int); ok {
+		if data, ok := tmp.(int); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *int`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be int`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*int)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalOID2ᚖint(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_removeUserFromConference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3264,6 +3178,70 @@ func (ec *executionContext) fieldContext_Mutation_removeUserFromConference(ctx c
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_updateSession(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_updateSession(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateSession(rctx)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Authenticated == nil {
+				return nil, errors.New("directive authenticated is not implemented")
+			}
+			return ec.directives.Authenticated(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(string); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be string`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateSession(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_loginUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_loginUser(ctx, field)
 	if err != nil {
@@ -3285,11 +3263,14 @@ func (ec *executionContext) _Mutation_loginUser(ctx context.Context, field graph
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_loginUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3337,11 +3318,14 @@ func (ec *executionContext) _Mutation_registerUser(ctx context.Context, field gr
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_registerUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3399,21 +3383,24 @@ func (ec *executionContext) _Mutation_updateUser(ctx context.Context, field grap
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*models.User); ok {
+		if data, ok := tmp.(int); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.User`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be int`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*models.User)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalOUser2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐUser(ctx, field.Selections, res)
+	return ec.marshalNID2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3423,21 +3410,7 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_User_id(ctx, field)
-			case "name":
-				return ec.fieldContext_User_name(ctx, field)
-			case "surname":
-				return ec.fieldContext_User_surname(ctx, field)
-			case "username":
-				return ec.fieldContext_User_username(ctx, field)
-			case "email":
-				return ec.fieldContext_User_email(ctx, field)
-			case "role":
-				return ec.fieldContext_User_role(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	defer func() {
@@ -3450,6 +3423,166 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 	if fc.Args, err = ec.field_Mutation_updateUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_editPassword(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_editPassword(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().EditPassword(rctx, fc.Args["password"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Authenticated == nil {
+				return nil, errors.New("directive authenticated is not implemented")
+			}
+			return ec.directives.Authenticated(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*bool); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *bool`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_editPassword(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_editPassword_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NewParticipantsTrend_date(ctx context.Context, field graphql.CollectedField, obj *models.NewParticipantsTrend) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewParticipantsTrend_date(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Date, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewParticipantsTrend_date(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewParticipantsTrend",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NewParticipantsTrend_newParticipants(ctx context.Context, field graphql.CollectedField, obj *models.NewParticipantsTrend) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewParticipantsTrend_newParticipants(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NewParticipants, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewParticipantsTrend_newParticipants(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewParticipantsTrend",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
 	}
 	return fc, nil
 }
@@ -3806,6 +3939,56 @@ func (ec *executionContext) fieldContext_OrganizerMetrics_totalOrganizedConferen
 	return fc, nil
 }
 
+func (ec *executionContext) _OrganizerMetrics_newParticipantsTrend(ctx context.Context, field graphql.CollectedField, obj *models.OrganizerMetrics) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_OrganizerMetrics_newParticipantsTrend(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.OrganizerMetrics().NewParticipantsTrend(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.NewParticipantsTrend)
+	fc.Result = res
+	return ec.marshalNNewParticipantsTrend2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewParticipantsTrendᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_OrganizerMetrics_newParticipantsTrend(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrganizerMetrics",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "date":
+				return ec.fieldContext_NewParticipantsTrend_date(ctx, field)
+			case "newParticipants":
+				return ec.fieldContext_NewParticipantsTrend_newParticipants(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type NewParticipantsTrend", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PageInfo_totalItems(ctx context.Context, field graphql.CollectedField, obj *models.PageInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_PageInfo_totalItems(ctx, field)
 	if err != nil {
@@ -3982,391 +4165,6 @@ func (ec *executionContext) fieldContext_PageInfo_size(ctx context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _ParticipantsJoiningTrend_trend(ctx context.Context, field graphql.CollectedField, obj *models.ParticipantsJoiningTrend) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ParticipantsJoiningTrend_trend(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Trend, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.([]*models.ChartTrend)
-	fc.Result = res
-	return ec.marshalNChartTrend2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐChartTrendᚄ(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ParticipantsJoiningTrend_trend(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ParticipantsJoiningTrend",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "date":
-				return ec.fieldContext_ChartTrend_date(ctx, field)
-			case "count":
-				return ec.fieldContext_ChartTrend_count(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ChartTrend", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ParticipantsJoiningTrend_granularity(ctx context.Context, field graphql.CollectedField, obj *models.ParticipantsJoiningTrend) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ParticipantsJoiningTrend_granularity(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Granularity, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(models.Granularity)
-	fc.Result = res
-	return ec.marshalNGranularity2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐGranularity(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ParticipantsJoiningTrend_granularity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ParticipantsJoiningTrend",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Granularity does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_conferences(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_conferences(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().Conferences(rctx, fc.Args["page"].(*models.Page), fc.Args["sort"].(*models.Sort), fc.Args["filters"].(*models.ConferenceFilter))
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.Authenticated == nil {
-				return nil, errors.New("directive authenticated is not implemented")
-			}
-			return ec.directives.Authenticated(ctx, nil, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(*models.ConferencePage); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.ConferencePage`, tmp)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*models.ConferencePage)
-	fc.Result = res
-	return ec.marshalOConferencePage2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencePage(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_conferences(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "data":
-				return ec.fieldContext_ConferencePage_data(ctx, field)
-			case "meta":
-				return ec.fieldContext_ConferencePage_meta(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ConferencePage", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_conferences_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_organizerMetrics(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_organizerMetrics(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().OrganizerMetrics(rctx)
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.Authenticated == nil {
-				return nil, errors.New("directive authenticated is not implemented")
-			}
-			return ec.directives.Authenticated(ctx, nil, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(*models.OrganizerMetrics); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.OrganizerMetrics`, tmp)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*models.OrganizerMetrics)
-	fc.Result = res
-	return ec.marshalOOrganizerMetrics2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐOrganizerMetrics(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_organizerMetrics(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "runningConferences":
-				return ec.fieldContext_OrganizerMetrics_runningConferences(ctx, field)
-			case "participantsCount":
-				return ec.fieldContext_OrganizerMetrics_participantsCount(ctx, field)
-			case "averageParticipantsCount":
-				return ec.fieldContext_OrganizerMetrics_averageParticipantsCount(ctx, field)
-			case "totalOrganizedConferences":
-				return ec.fieldContext_OrganizerMetrics_totalOrganizedConferences(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type OrganizerMetrics", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_participantsJoiningTrend(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_participantsJoiningTrend(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().ParticipantsJoiningTrend(rctx)
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			role, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, "Organizer")
-			if err != nil {
-				return nil, err
-			}
-			if ec.directives.HasRole == nil {
-				return nil, errors.New("directive hasRole is not implemented")
-			}
-			return ec.directives.HasRole(ctx, nil, directive0, role)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(*models.ParticipantsJoiningTrend); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.ParticipantsJoiningTrend`, tmp)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*models.ParticipantsJoiningTrend)
-	fc.Result = res
-	return ec.marshalOParticipantsJoiningTrend2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐParticipantsJoiningTrend(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_participantsJoiningTrend(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "trend":
-				return ec.fieldContext_ParticipantsJoiningTrend_trend(ctx, field)
-			case "granularity":
-				return ec.fieldContext_ParticipantsJoiningTrend_granularity(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ParticipantsJoiningTrend", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_conferencesMetrics(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_conferencesMetrics(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().ConferencesMetrics(rctx)
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			if ec.directives.Authenticated == nil {
-				return nil, errors.New("directive authenticated is not implemented")
-			}
-			return ec.directives.Authenticated(ctx, nil, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(*models.ConferencesMetrics); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.ConferencesMetrics`, tmp)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*models.ConferencesMetrics)
-	fc.Result = res
-	return ec.marshalOConferencesMetrics2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencesMetrics(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_conferencesMetrics(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "runningConferences":
-				return ec.fieldContext_ConferencesMetrics_runningConferences(ctx, field)
-			case "startingInLessThan24Hours":
-				return ec.fieldContext_ConferencesMetrics_startingInLessThan24Hours(ctx, field)
-			case "totalConducted":
-				return ec.fieldContext_ConferencesMetrics_totalConducted(ctx, field)
-			case "participantsToday":
-				return ec.fieldContext_ConferencesMetrics_participantsToday(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ConferencesMetrics", field.Name)
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Query_conference(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_conference(ctx, field)
 	if err != nil {
@@ -4408,11 +4206,14 @@ func (ec *executionContext) _Query_conference(ctx context.Context, field graphql
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
 	res := resTmp.(*models.Conference)
 	fc.Result = res
-	return ec.marshalOConference2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConference(ctx, field.Selections, res)
+	return ec.marshalNConference2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConference(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_conference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -4469,8 +4270,8 @@ func (ec *executionContext) fieldContext_Query_conference(ctx context.Context, f
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_isParticipant(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_isParticipant(ctx, field)
+func (ec *executionContext) _Query_conferences(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_conferences(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4484,17 +4285,13 @@ func (ec *executionContext) _Query_isParticipant(ctx context.Context, field grap
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().IsParticipant(rctx, fc.Args["conferenceId"].(int))
+			return ec.resolvers.Query().Conferences(rctx, fc.Args["page"].(*models.Page), fc.Args["sort"].(*models.Sort), fc.Args["filters"].(*models.ConferencesFilters))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
-			role, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, "Participant")
-			if err != nil {
-				return nil, err
+			if ec.directives.Authenticated == nil {
+				return nil, errors.New("directive authenticated is not implemented")
 			}
-			if ec.directives.HasRole == nil {
-				return nil, errors.New("directive hasRole is not implemented")
-			}
-			return ec.directives.HasRole(ctx, nil, directive0, role)
+			return ec.directives.Authenticated(ctx, nil, directive0)
 		}
 
 		tmp, err := directive1(rctx)
@@ -4504,31 +4301,42 @@ func (ec *executionContext) _Query_isParticipant(ctx context.Context, field grap
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(*bool); ok {
+		if data, ok := tmp.(*models.ConferencesPage); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *bool`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.ConferencesPage`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*bool)
+	res := resTmp.(*models.ConferencesPage)
 	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+	return ec.marshalNConferencesPage2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencesPage(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_isParticipant(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_conferences(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
+			switch field.Name {
+			case "data":
+				return ec.fieldContext_ConferencesPage_data(ctx, field)
+			case "meta":
+				return ec.fieldContext_ConferencesPage_meta(ctx, field)
+			case "metrics":
+				return ec.fieldContext_ConferencesPage_metrics(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ConferencesPage", field.Name)
 		},
 	}
 	defer func() {
@@ -4538,83 +4346,7 @@ func (ec *executionContext) fieldContext_Query_isParticipant(ctx context.Context
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_isParticipant_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_isOrganizer(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_isOrganizer(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		directive0 := func(rctx context.Context) (interface{}, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().IsOrganizer(rctx, fc.Args["conferenceId"].(int))
-		}
-		directive1 := func(ctx context.Context) (interface{}, error) {
-			role, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, "Organizer")
-			if err != nil {
-				return nil, err
-			}
-			if ec.directives.HasRole == nil {
-				return nil, errors.New("directive hasRole is not implemented")
-			}
-			return ec.directives.HasRole(ctx, nil, directive0, role)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(*bool); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be *bool`, tmp)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*bool)
-	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_isOrganizer(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_isOrganizer_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Query_conferences_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4839,9 +4571,86 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 				return ec.fieldContext_User_email(ctx, field)
 			case "role":
 				return ec.fieldContext_User_role(ctx, field)
+			case "metrics":
+				return ec.fieldContext_User_metrics(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_isUserAssociatedWithConference(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_isUserAssociatedWithConference(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().IsUserAssociatedWithConference(rctx, fc.Args["conferenceId"].(int))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Authenticated == nil {
+				return nil, errors.New("directive authenticated is not implemented")
+			}
+			return ec.directives.Authenticated(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(bool); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be bool`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_isUserAssociatedWithConference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_isUserAssociatedWithConference_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -5218,11 +5027,14 @@ func (ec *executionContext) _SubSection_title(ctx context.Context, field graphql
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_SubSection_title(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -5259,11 +5071,14 @@ func (ec *executionContext) _SubSection_content(ctx context.Context, field graph
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_SubSection_content(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -5759,6 +5574,83 @@ func (ec *executionContext) fieldContext_User_role(ctx context.Context, field gr
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Role does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_metrics(ctx context.Context, field graphql.CollectedField, obj *models.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_metrics(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.User().Metrics(rctx, obj)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			role, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, "Organizer")
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.HasRole == nil {
+				return nil, errors.New("directive hasRole is not implemented")
+			}
+			return ec.directives.HasRole(ctx, obj, directive0, role)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*models.OrganizerMetrics); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.OrganizerMetrics`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.OrganizerMetrics)
+	fc.Result = res
+	return ec.marshalOOrganizerMetrics2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐOrganizerMetrics(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_metrics(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "runningConferences":
+				return ec.fieldContext_OrganizerMetrics_runningConferences(ctx, field)
+			case "participantsCount":
+				return ec.fieldContext_OrganizerMetrics_participantsCount(ctx, field)
+			case "averageParticipantsCount":
+				return ec.fieldContext_OrganizerMetrics_averageParticipantsCount(ctx, field)
+			case "totalOrganizedConferences":
+				return ec.fieldContext_OrganizerMetrics_totalOrganizedConferences(ctx, field)
+			case "newParticipantsTrend":
+				return ec.fieldContext_OrganizerMetrics_newParticipantsTrend(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type OrganizerMetrics", field.Name)
 		},
 	}
 	return fc, nil
@@ -7537,42 +7429,8 @@ func (ec *executionContext) fieldContext___Type_specifiedByURL(ctx context.Conte
 
 // region    **************************** input.gotpl *****************************
 
-func (ec *executionContext) unmarshalInputConferenceFilter(ctx context.Context, obj interface{}) (models.ConferenceFilter, error) {
-	var it models.ConferenceFilter
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"associatedOnly", "title"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "associatedOnly":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("associatedOnly"))
-			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.AssociatedOnly = data
-		case "title":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("title"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Title = data
-		}
-	}
-
-	return it, nil
-}
-
-func (ec *executionContext) unmarshalInputCreateAgendaItemInput(ctx context.Context, obj interface{}) (models.CreateAgendaItemInput, error) {
-	var it models.CreateAgendaItemInput
+func (ec *executionContext) unmarshalInputAgendaItemInput(ctx context.Context, obj interface{}) (models.AgendaItemInput, error) {
+	var it models.AgendaItemInput
 	asMap := map[string]interface{}{}
 	for k, v := range obj.(map[string]interface{}) {
 		asMap[k] = v
@@ -7613,6 +7471,67 @@ func (ec *executionContext) unmarshalInputCreateAgendaItemInput(ctx context.Cont
 				return it, err
 			}
 			it.Speaker = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputConferencesFilters(ctx context.Context, obj interface{}) (models.ConferencesFilters, error) {
+	var it models.ConferencesFilters
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"associatedOnly", "title"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "associatedOnly":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("associatedOnly"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AssociatedOnly = data
+		case "title":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("title"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Title = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputCreateAgendaItemInput(ctx context.Context, obj interface{}) (models.CreateAgendaItemInput, error) {
+	var it models.CreateAgendaItemInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"createItem"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "createItem":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("createItem"))
+			data, err := ec.unmarshalOAgendaItemInput2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐAgendaItemInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CreateItem = data
 		}
 	}
 
@@ -7750,20 +7669,20 @@ func (ec *executionContext) unmarshalInputDeleteFile(ctx context.Context, obj in
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id"}
+	fieldsInOrder := [...]string{"key"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "id":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-			data, err := ec.unmarshalNID2int(ctx, v)
+		case "key":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("key"))
+			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.ID = data
+			it.Key = data
 		}
 	}
 
@@ -7811,55 +7730,27 @@ func (ec *executionContext) unmarshalInputModifyAgendaItemInput(ctx context.Cont
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "startTime", "endTime", "event", "speaker", "_destroy"}
+	fieldsInOrder := [...]string{"createItem", "deleteItem"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "id":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		case "createItem":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("createItem"))
+			data, err := ec.unmarshalOAgendaItemInput2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐAgendaItemInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CreateItem = data
+		case "deleteItem":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("deleteItem"))
 			data, err := ec.unmarshalOID2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.ID = data
-		case "startTime":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("startTime"))
-			data, err := ec.unmarshalNTime2timeᚐTime(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.StartTime = data
-		case "endTime":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("endTime"))
-			data, err := ec.unmarshalNTime2timeᚐTime(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.EndTime = data
-		case "event":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("event"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Event = data
-		case "speaker":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("speaker"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Speaker = data
-		case "_destroy":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("_destroy"))
-			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Destroy = data
+			it.DeleteItem = data
 		}
 	}
 
@@ -8262,50 +8153,6 @@ func (ec *executionContext) _AgendaItem(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
-var chartTrendImplementors = []string{"ChartTrend"}
-
-func (ec *executionContext) _ChartTrend(ctx context.Context, sel ast.SelectionSet, obj *models.ChartTrend) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, chartTrendImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ChartTrend")
-		case "date":
-			out.Values[i] = ec._ChartTrend_date(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "count":
-			out.Values[i] = ec._ChartTrend_count(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
 var conferenceImplementors = []string{"Conference"}
 
 func (ec *executionContext) _Conference(ctx context.Context, sel ast.SelectionSet, obj *models.Conference) graphql.Marshaler {
@@ -8425,10 +8272,41 @@ func (ec *executionContext) _Conference(ctx context.Context, sel ast.SelectionSe
 		case "registrationDeadline":
 			out.Values[i] = ec._Conference_registrationDeadline(ctx, field, obj)
 		case "files":
-			out.Values[i] = ec._Conference_files(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Conference_files(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "eventsCount":
 			field := field
 
@@ -8527,50 +8405,6 @@ func (ec *executionContext) _ConferenceMeta(ctx context.Context, sel ast.Selecti
 	return out
 }
 
-var conferencePageImplementors = []string{"ConferencePage"}
-
-func (ec *executionContext) _ConferencePage(ctx context.Context, sel ast.SelectionSet, obj *models.ConferencePage) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, conferencePageImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ConferencePage")
-		case "data":
-			out.Values[i] = ec._ConferencePage_data(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "meta":
-			out.Values[i] = ec._ConferencePage_meta(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
 var conferencesMetricsImplementors = []string{"ConferencesMetrics"}
 
 func (ec *executionContext) _ConferencesMetrics(ctx context.Context, sel ast.SelectionSet, obj *models.ConferencesMetrics) graphql.Marshaler {
@@ -8625,6 +8459,86 @@ func (ec *executionContext) _ConferencesMetrics(ctx context.Context, sel ast.Sel
 	return out
 }
 
+var conferencesPageImplementors = []string{"ConferencesPage"}
+
+func (ec *executionContext) _ConferencesPage(ctx context.Context, sel ast.SelectionSet, obj *models.ConferencesPage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, conferencesPageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ConferencesPage")
+		case "data":
+			out.Values[i] = ec._ConferencesPage_data(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "meta":
+			out.Values[i] = ec._ConferencesPage_meta(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "metrics":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ConferencesPage_metrics(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var fileImplementors = []string{"File"}
 
 func (ec *executionContext) _File(ctx context.Context, sel ast.SelectionSet, obj *models.File) graphql.Marshaler {
@@ -8636,13 +8550,8 @@ func (ec *executionContext) _File(ctx context.Context, sel ast.SelectionSet, obj
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("File")
-		case "id":
-			out.Values[i] = ec._File_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "name":
-			out.Values[i] = ec._File_name(ctx, field, obj)
+		case "key":
+			out.Values[i] = ec._File_key(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -8702,30 +8611,106 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createConference(ctx, field)
 			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "modifyConference":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_modifyConference(ctx, field)
 			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "addUserToConference":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_addUserToConference(ctx, field)
 			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "removeUserFromConference":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_removeUserFromConference(ctx, field)
 			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateSession":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateSession(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "loginUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_loginUser(ctx, field)
 			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "registerUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_registerUser(ctx, field)
 			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "updateUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateUser(ctx, field)
 			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "editPassword":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_editPassword(ctx, field)
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var newParticipantsTrendImplementors = []string{"NewParticipantsTrend"}
+
+func (ec *executionContext) _NewParticipantsTrend(ctx context.Context, sel ast.SelectionSet, obj *models.NewParticipantsTrend) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, newParticipantsTrendImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("NewParticipantsTrend")
+		case "date":
+			out.Values[i] = ec._NewParticipantsTrend_date(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "newParticipants":
+			out.Values[i] = ec._NewParticipantsTrend_newParticipants(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8817,23 +8802,59 @@ func (ec *executionContext) _OrganizerMetrics(ctx context.Context, sel ast.Selec
 		case "runningConferences":
 			out.Values[i] = ec._OrganizerMetrics_runningConferences(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "participantsCount":
 			out.Values[i] = ec._OrganizerMetrics_participantsCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "averageParticipantsCount":
 			out.Values[i] = ec._OrganizerMetrics_averageParticipantsCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "totalOrganizedConferences":
 			out.Values[i] = ec._OrganizerMetrics_totalOrganizedConferences(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "newParticipantsTrend":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._OrganizerMetrics_newParticipantsTrend(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8911,50 +8932,6 @@ func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
-var participantsJoiningTrendImplementors = []string{"ParticipantsJoiningTrend"}
-
-func (ec *executionContext) _ParticipantsJoiningTrend(ctx context.Context, sel ast.SelectionSet, obj *models.ParticipantsJoiningTrend) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, participantsJoiningTrendImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ParticipantsJoiningTrend")
-		case "trend":
-			out.Values[i] = ec._ParticipantsJoiningTrend_trend(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "granularity":
-			out.Values[i] = ec._ParticipantsJoiningTrend_granularity(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -8974,82 +8951,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
-		case "conferences":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_conferences(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "organizerMetrics":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_organizerMetrics(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "participantsJoiningTrend":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_participantsJoiningTrend(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "conferencesMetrics":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_conferencesMetrics(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "conference":
 			field := field
 
@@ -9060,6 +8961,9 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_conference(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -9069,7 +8973,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "isParticipant":
+		case "conferences":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -9078,26 +8982,10 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_isParticipant(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "isOrganizer":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_isOrganizer(ctx, field)
+				res = ec._Query_conferences(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -9161,6 +9049,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_user(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "isUserAssociatedWithConference":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_isUserAssociatedWithConference(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -9298,8 +9208,14 @@ func (ec *executionContext) _SubSection(ctx context.Context, sel ast.SelectionSe
 			}
 		case "title":
 			out.Values[i] = ec._SubSection_title(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "content":
 			out.Values[i] = ec._SubSection_content(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -9427,7 +9343,7 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 		case "id":
 			out.Values[i] = ec._User_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "name":
 			out.Values[i] = ec._User_name(ctx, field, obj)
@@ -9438,13 +9354,46 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 		case "email":
 			out.Values[i] = ec._User_email(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "role":
 			out.Values[i] = ec._User_role(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "metrics":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_metrics(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -9863,58 +9812,8 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) marshalNChartTrend2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐChartTrendᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.ChartTrend) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNChartTrend2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐChartTrend(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
-func (ec *executionContext) marshalNChartTrend2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐChartTrend(ctx context.Context, sel ast.SelectionSet, v *models.ChartTrend) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._ChartTrend(ctx, sel, v)
+func (ec *executionContext) marshalNConference2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConference(ctx context.Context, sel ast.SelectionSet, v models.Conference) graphql.Marshaler {
+	return ec._Conference(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNConference2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferenceᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Conference) graphql.Marshaler {
@@ -9979,6 +9878,34 @@ func (ec *executionContext) marshalNConferenceMeta2ᚖgithubᚗcomᚋmaciejas22�
 		return graphql.Null
 	}
 	return ec._ConferenceMeta(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNConferencesMetrics2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencesMetrics(ctx context.Context, sel ast.SelectionSet, v models.ConferencesMetrics) graphql.Marshaler {
+	return ec._ConferencesMetrics(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNConferencesMetrics2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencesMetrics(ctx context.Context, sel ast.SelectionSet, v *models.ConferencesMetrics) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ConferencesMetrics(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNConferencesPage2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencesPage(ctx context.Context, sel ast.SelectionSet, v models.ConferencesPage) graphql.Marshaler {
+	return ec._ConferencesPage(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNConferencesPage2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencesPage(ctx context.Context, sel ast.SelectionSet, v *models.ConferencesPage) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ConferencesPage(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNCreateAgendaItemInput2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐCreateAgendaItemInput(ctx context.Context, v interface{}) (*models.CreateAgendaItemInput, error) {
@@ -10065,16 +9992,6 @@ func (ec *executionContext) marshalNFloat2float64(ctx context.Context, sel ast.S
 	return graphql.WrapContextMarshaler(ctx, res)
 }
 
-func (ec *executionContext) unmarshalNGranularity2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐGranularity(ctx context.Context, v interface{}) (models.Granularity, error) {
-	var res models.Granularity
-	err := res.UnmarshalGQL(v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNGranularity2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐGranularity(ctx context.Context, sel ast.SelectionSet, v models.Granularity) graphql.Marshaler {
-	return v
-}
-
 func (ec *executionContext) unmarshalNID2int(ctx context.Context, v interface{}) (int, error) {
 	res, err := graphql.UnmarshalInt(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -10105,21 +10022,6 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 	return res
 }
 
-func (ec *executionContext) unmarshalNInt2int64(ctx context.Context, v interface{}) (int64, error) {
-	res, err := graphql.UnmarshalInt64(v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNInt2int64(ctx context.Context, sel ast.SelectionSet, v int64) graphql.Marshaler {
-	res := graphql.MarshalInt64(v)
-	if res == graphql.Null {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-	}
-	return res
-}
-
 func (ec *executionContext) unmarshalNLoginUserInput2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐLoginUserInput(ctx context.Context, v interface{}) (models.LoginUserInput, error) {
 	res, err := ec.unmarshalInputLoginUserInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -10138,6 +10040,60 @@ func (ec *executionContext) unmarshalNModifyConferenceInput2githubᚗcomᚋmacie
 func (ec *executionContext) unmarshalNModifyConferenceInputFile2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐModifyConferenceInputFile(ctx context.Context, v interface{}) (*models.ModifyConferenceInputFile, error) {
 	res, err := ec.unmarshalInputModifyConferenceInputFile(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNNewParticipantsTrend2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewParticipantsTrendᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.NewParticipantsTrend) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNNewParticipantsTrend2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewParticipantsTrend(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNNewParticipantsTrend2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewParticipantsTrend(ctx context.Context, sel ast.SelectionSet, v *models.NewParticipantsTrend) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._NewParticipantsTrend(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNNews2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewsᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.News) graphql.Marshaler {
@@ -10639,6 +10595,14 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
+func (ec *executionContext) unmarshalOAgendaItemInput2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐAgendaItemInput(ctx context.Context, v interface{}) (*models.AgendaItemInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputAgendaItemInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -10665,33 +10629,12 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
-func (ec *executionContext) marshalOConference2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConference(ctx context.Context, sel ast.SelectionSet, v *models.Conference) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._Conference(ctx, sel, v)
-}
-
-func (ec *executionContext) unmarshalOConferenceFilter2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferenceFilter(ctx context.Context, v interface{}) (*models.ConferenceFilter, error) {
+func (ec *executionContext) unmarshalOConferencesFilters2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencesFilters(ctx context.Context, v interface{}) (*models.ConferencesFilters, error) {
 	if v == nil {
 		return nil, nil
 	}
-	res, err := ec.unmarshalInputConferenceFilter(ctx, v)
+	res, err := ec.unmarshalInputConferencesFilters(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOConferencePage2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencePage(ctx context.Context, sel ast.SelectionSet, v *models.ConferencePage) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._ConferencePage(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOConferencesMetrics2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConferencesMetrics(ctx context.Context, sel ast.SelectionSet, v *models.ConferencesMetrics) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._ConferencesMetrics(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOCreateAgendaItemInput2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐCreateAgendaItemInputᚄ(ctx context.Context, v interface{}) ([]*models.CreateAgendaItemInput, error) {
@@ -10827,13 +10770,6 @@ func (ec *executionContext) unmarshalOPage2ᚖgithubᚗcomᚋmaciejas22ᚋconfer
 	}
 	res, err := ec.unmarshalInputPage(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOParticipantsJoiningTrend2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐParticipantsJoiningTrend(ctx context.Context, sel ast.SelectionSet, v *models.ParticipantsJoiningTrend) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._ParticipantsJoiningTrend(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOSort2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐSort(ctx context.Context, v interface{}) (*models.Sort, error) {

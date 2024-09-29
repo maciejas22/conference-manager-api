@@ -2,10 +2,8 @@ package repositories
 
 import (
 	"errors"
-	"log"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/maciejas22/conference-manager/api/db"
 )
 
 type Subsection struct {
@@ -21,18 +19,16 @@ func (s *Subsection) TableName() string {
 	return "subsections"
 }
 
-func GetToSSubsections(qe *db.QueryExecutor, sectionId int) ([]Subsection, error) {
+func GetToSSubsections(tx *sqlx.Tx, sectionId int) ([]Subsection, error) {
 	var subsections []Subsection
 	s := &Subsection{}
-	query := "SELECT id, section_id, title, content FROM " + s.TableName() + " WHERE section_id = ?"
-	err := sqlx.Select(
-		qe,
+	query := "SELECT id, section_id, title, content FROM " + s.TableName() + " WHERE section_id = $1"
+	err := tx.Select(
 		&subsections,
 		query,
 		sectionId,
 	)
 	if err != nil {
-		log.Println(err)
 		return nil, errors.New("could not get subsections")
 	}
 	return subsections, nil

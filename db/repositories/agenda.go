@@ -2,12 +2,11 @@ package repositories
 
 import (
 	"github.com/jmoiron/sqlx"
-	"github.com/maciejas22/conference-manager/api/db"
 )
 
 type AgendaItem struct {
 	Id           int    `json:"id" db:"id"`
-	ConferenceId int    `json:"confrence_id" db:"conference_id"`
+	ConferenceId int    `json:"conference_id" db:"conference_id"`
 	StartTime    string `json:"start_time" db:"start_time"`
 	EndTime      string `json:"end_time" db:"end_time"`
 	Event        string `json:"event" db:"event"`
@@ -20,12 +19,11 @@ func (a *AgendaItem) TableName() string {
 	return "agenda"
 }
 
-func GetAgenda(qe *db.QueryExecutor, conferenceId int) ([]AgendaItem, error) {
+func GetAgenda(tx *sqlx.Tx, conferenceId int) ([]AgendaItem, error) {
 	var agenda []AgendaItem
 	a := AgendaItem{}
-	query := "SELECT id, conference_id, start_time, end_time, event, speaker FROM " + a.TableName() + " WHERE conference_id = ?"
-	err := sqlx.Select(
-		qe,
+	query := "SELECT id, conference_id, start_time, end_time, event, speaker FROM " + a.TableName() + " WHERE conference_id = $1"
+	err := tx.Select(
 		&agenda,
 		query,
 		conferenceId,
@@ -36,9 +34,9 @@ func GetAgenda(qe *db.QueryExecutor, conferenceId int) ([]AgendaItem, error) {
 	return agenda, nil
 }
 
-func CreateAgenda(qe *db.QueryExecutor, agenda AgendaItem) error {
-	query := "INSERT INTO " + agenda.TableName() + " (conference_id, start_time, end_time, event, speaker) VALUES (?, ?, ?, ?, ?)"
-	_, err := qe.Exec(query, agenda.ConferenceId, agenda.StartTime, agenda.EndTime, agenda.Event, agenda.Speaker)
+func CreateAgenda(tx *sqlx.Tx, agenda AgendaItem) error {
+	query := "INSERT INTO " + agenda.TableName() + " (conference_id, start_time, end_time, event, speaker) VALUES ($1, $2, $3, $4, $5)"
+	_, err := tx.Exec(query, agenda.ConferenceId, agenda.StartTime, agenda.EndTime, agenda.Event, agenda.Speaker)
 	if err != nil {
 		return err
 	}
@@ -46,9 +44,9 @@ func CreateAgenda(qe *db.QueryExecutor, agenda AgendaItem) error {
 	return nil
 }
 
-func UpdateAgenda(qe *db.QueryExecutor, agenda AgendaItem) error {
-	query := "UPDATE " + agenda.TableName() + " SET start_time = ?, end_time = ?, event = ?, speaker = ? WHERE id = ?"
-	_, err := qe.Exec(query, agenda.StartTime, agenda.EndTime, agenda.Event, agenda.Speaker, agenda.Id)
+func DeleteAgenda(tx *sqlx.Tx, agendaId int) error {
+	query := "DELETE FROM " + new(AgendaItem).TableName() + " WHERE id = $1"
+	_, err := tx.Exec(query, agendaId)
 	if err != nil {
 		return err
 	}
@@ -56,21 +54,10 @@ func UpdateAgenda(qe *db.QueryExecutor, agenda AgendaItem) error {
 	return nil
 }
 
-func DeleteAgenda(qe *db.QueryExecutor, agendaId int) error {
-	a := AgendaItem{}
-	query := "DELETE FROM " + a.TableName() + " WHERE id = ?"
-	_, err := qe.Exec(query, agendaId)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func CountAgendaItems(qe *db.QueryExecutor, conferenceId int) (int, error) {
+func CountAgendaItems(tx *sqlx.Tx, conferenceId int) (int, error) {
 	var count int
-	query := "SELECT COUNT(*) FROM " + new(AgendaItem).TableName() + " WHERE conference_id = ?"
-	err := sqlx.Get(qe, &count, query, conferenceId)
+	query := "SELECT COUNT(*) FROM " + new(AgendaItem).TableName() + " WHERE conference_id = $1"
+	err := tx.Get(&count, query, conferenceId)
 	if err != nil {
 		return 0, err
 	}

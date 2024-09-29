@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
-	"strconv"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
+	filters "github.com/maciejas22/conference-manager/api/db/repositories/shared"
 	"github.com/maciejas22/conference-manager/api/internal/converters"
+	"github.com/maciejas22/conference-manager/api/internal/files"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 	"github.com/maciejas22/conference-manager/api/internal/utils"
 	"github.com/maciejas22/conference-manager/api/pkg/s3"
@@ -14,13 +16,13 @@ import (
 
 func CreateConference(ctx context.Context, dbClient *db.DB, s3 *s3.S3Client, userId int, createConferenceInput models.CreateConferenceInput) (*int, error) {
 	var conferenceId int
-	err := db.Transaction(ctx, dbClient.QueryExecutor, func(qe *db.QueryExecutor) error {
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
 		startDate := createConferenceInput.StartDate
 		startDateString := utils.TimeToString(&startDate)
 		endDate := createConferenceInput.EndDate
 		endDateString := utils.TimeToString(&endDate)
 		deadlineString := utils.TimeToString(createConferenceInput.RegistrationDeadline)
-		conferenceId, err := repositories.CreateConference(qe, repositories.Conference{
+		conferenceId, err := repositories.CreateConference(tx, repositories.Conference{
 			Title:                createConferenceInput.Title,
 			StartDate:            *startDateString,
 			EndDate:              *endDateString,
@@ -36,14 +38,14 @@ func CreateConference(ctx context.Context, dbClient *db.DB, s3 *s3.S3Client, use
 		}
 
 		for _, a := range createConferenceInput.Agenda {
-			startTime := utils.TimeToString(&a.StartTime)
-			endTime := utils.TimeToString(&a.EndTime)
-			err = repositories.CreateAgenda(qe, repositories.AgendaItem{
+			startTime := utils.TimeToString(&a.CreateItem.StartTime)
+			endTime := utils.TimeToString(&a.CreateItem.EndTime)
+			err = repositories.CreateAgenda(tx, repositories.AgendaItem{
 				ConferenceId: conferenceId,
 				StartTime:    *startTime,
 				EndTime:      *endTime,
-				Event:        a.Event,
-				Speaker:      a.Speaker,
+				Event:        a.CreateItem.Event,
+				Speaker:      a.CreateItem.Speaker,
 			})
 
 			if err != nil {
@@ -56,11 +58,12 @@ func CreateConference(ctx context.Context, dbClient *db.DB, s3 *s3.S3Client, use
 			if err != nil {
 				return err
 			}
-			err = repositories.UploadFile(ctx, s3, strconv.Itoa(conferenceId), file.Name, file.Content)
+			err = files.UploadConferenceFile(ctx, s3, conferenceId, file.Name, file.Content)
 			if err != nil {
 				return err
 			}
 		}
+
 		return nil
 	})
 
@@ -68,14 +71,15 @@ func CreateConference(ctx context.Context, dbClient *db.DB, s3 *s3.S3Client, use
 }
 
 func ModifyConference(ctx context.Context, dbClient *db.DB, s3 *s3.S3Client, input models.ModifyConferenceInput) (*int, error) {
-	var conferenceId *int
-	err := db.Transaction(ctx, dbClient.QueryExecutor, func(qe *db.QueryExecutor) error {
+	var conferenceId int
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
 		startDate := input.StartDate
 		startDateString := utils.TimeToString(startDate)
 		endDate := input.EndDate
 		endDateString := utils.TimeToString(endDate)
 		deadlineString := utils.TimeToString(input.RegistrationDeadline)
-		conference, err := repositories.UpdateConference(qe, repositories.Conference{
+		conferenceId, err = repositories.UpdateConference(tx, repositories.Conference{
 			Id:                   input.ID,
 			Title:                *input.Title,
 			StartDate:            *startDateString,
@@ -92,47 +96,30 @@ func ModifyConference(ctx context.Context, dbClient *db.DB, s3 *s3.S3Client, inp
 		}
 
 		for _, a := range input.Agenda {
-			startTime := utils.TimeToString(&a.StartTime)
-			endTime := utils.TimeToString(&a.EndTime)
-
-			if a.ID != nil && a.Destroy != nil && *a.Destroy {
-				err = repositories.DeleteAgenda(qe, *a.ID)
-				if err != nil {
-					return err
-				}
-			} else if a.ID == nil {
-				err = repositories.CreateAgenda(qe, repositories.AgendaItem{
-					ConferenceId: conference.Id,
+			if a.CreateItem != nil {
+				startTime := utils.TimeToString(&a.CreateItem.StartTime)
+				endTime := utils.TimeToString(&a.CreateItem.EndTime)
+				err = repositories.CreateAgenda(tx, repositories.AgendaItem{
+					ConferenceId: input.ID,
 					StartTime:    *startTime,
 					EndTime:      *endTime,
-					Event:        a.Event,
-					Speaker:      a.Speaker,
+					Event:        a.CreateItem.Event,
+					Speaker:      a.CreateItem.Speaker,
 				})
-
 				if err != nil {
 					return err
 				}
-
-			} else if a.ID != nil {
-				err = repositories.UpdateAgenda(qe, repositories.AgendaItem{
-					Id:           *a.ID,
-					ConferenceId: conference.Id,
-					StartTime:    *startTime,
-					EndTime:      *endTime,
-					Event:        a.Event,
-					Speaker:      a.Speaker,
-				})
-
+			} else if a.DeleteItem != nil {
+				err = repositories.DeleteAgenda(tx, *a.DeleteItem)
 				if err != nil {
 					return err
 				}
-
 			}
 		}
 
 		for _, f := range input.Files {
 			if f.DeleteFile != nil {
-				err = repositories.DeleteFile(ctx, s3, strconv.Itoa(f.DeleteFile.ID))
+				err = files.DeleteConferenceFile(ctx, s3, f.DeleteFile.Key)
 				if err != nil {
 					return err
 				}
@@ -141,30 +128,39 @@ func ModifyConference(ctx context.Context, dbClient *db.DB, s3 *s3.S3Client, inp
 				if err != nil {
 					return err
 				}
-				err = repositories.UploadFile(ctx, s3, strconv.Itoa(conference.Id), file.Name, file.Content)
+				err = files.UploadConferenceFile(ctx, s3, input.ID, file.Name, file.Content)
 				if err != nil {
 					return err
 				}
 			}
 		}
 
-		conferenceId = &conference.Id
 		return nil
 	})
 
-	return conferenceId, err
+	return &conferenceId, err
 }
 
-func GetAllConferences(ctx context.Context, dbClient *db.DB, userId int, page *models.Page, sort *models.Sort, filters *models.ConferenceFilter) (*models.ConferencePage, error) {
-	c, m, err := repositories.GetAllConferences(
-		dbClient.QueryExecutor,
-		userId,
-		converters.ConvertPageSchemaToRepo(page),
-		converters.ConvertSortSchemaToRepo(sort),
-		converters.ConvertConferenceFiltersSchemaToRepo(filters),
-	)
+func GetAllConferences(ctx context.Context, dbClient *db.DB, userId int, p *models.Page, s *models.Sort, f *models.ConferencesFilters) (*models.ConferencesPage, error) {
+	var c []repositories.Conference
+	var m filters.PaginationMeta
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		c, m, err = repositories.GetAllConferences(
+			tx,
+			userId,
+			converters.ConvertPageSchemaToRepo(p),
+			converters.ConvertSortSchemaToRepo(s),
+			converters.ConvertConferenceFiltersSchemaToRepo(f),
+		)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
-		return nil, err
+		return &models.ConferencesPage{}, err
 	}
 
 	var conferences []*models.Conference
@@ -172,7 +168,7 @@ func GetAllConferences(ctx context.Context, dbClient *db.DB, userId int, page *m
 		conferences = append(conferences, converters.ConvertConferenceRepoToSchema(&conference))
 	}
 
-	return &models.ConferencePage{
+	return &models.ConferencesPage{
 		Data: conferences,
 		Meta: &models.ConferenceMeta{
 			Page: &models.PageInfo{
@@ -186,7 +182,16 @@ func GetAllConferences(ctx context.Context, dbClient *db.DB, userId int, page *m
 }
 
 func GetConference(ctx context.Context, dbClient *db.DB, id int) (*models.Conference, error) {
-	conference, err := repositories.GetConference(dbClient.QueryExecutor, id)
+	var conference repositories.Conference
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		conference, err = repositories.GetConference(tx, id)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return &models.Conference{}, err
 	}
@@ -195,7 +200,16 @@ func GetConference(ctx context.Context, dbClient *db.DB, id int) (*models.Confer
 }
 
 func GetConferencesMetrics(ctx context.Context, dbClient *db.DB) (*models.ConferencesMetrics, error) {
-	metrics, err := repositories.GetMetrics(dbClient.QueryExecutor)
+	var metrics repositories.ConferencesMetrics
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		metrics, err = repositories.GetMetrics(tx)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}

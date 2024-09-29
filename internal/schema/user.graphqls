@@ -3,6 +3,19 @@ enum Role {
   Participant
 }
 
+type NewParticipantsTrend {
+  date: Time!
+  newParticipants: Int!
+}
+
+type OrganizerMetrics {
+  runningConferences: Int!
+  participantsCount: Int!
+  averageParticipantsCount: Float!
+  totalOrganizedConferences: Int!
+  newParticipantsTrend: [NewParticipantsTrend!]!
+}
+
 type User {
   id: ID!
   name: String
@@ -10,10 +23,12 @@ type User {
   username: String
   email: String!
   role: Role!
+  metrics: OrganizerMetrics @hasRole(role: Organizer)
 }
 
 extend type Query {
   user: User @authenticated
+  isUserAssociatedWithConference(conferenceId: ID!): Boolean! @authenticated
 }
 
 input LoginUserInput {
@@ -35,7 +50,9 @@ input UpdateUserInput {
 }
 
 extend type Mutation {
-  loginUser(loginUserInput: LoginUserInput!): String
-  registerUser(registerUserInput: RegisterUserInput!): String
-  updateUser(updateUserInput: UpdateUserInput!): User @authenticated
+  updateSession: String! @authenticated
+  loginUser(loginUserInput: LoginUserInput!): String!
+  registerUser(registerUserInput: RegisterUserInput!): String!
+  updateUser(updateUserInput: UpdateUserInput!): ID! @authenticated
+  editPassword(password: String!): Boolean @authenticated
 }

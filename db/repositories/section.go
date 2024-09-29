@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"github.com/jmoiron/sqlx"
-	"github.com/maciejas22/conference-manager/api/db"
 )
 
 type Section struct {
@@ -18,12 +17,11 @@ func (s *Section) TableName() string {
 	return "sections"
 }
 
-func GetToSSections(qe *db.QueryExecutor, termsOfServiceId int) ([]Section, error) {
+func GetToSSections(tx *sqlx.Tx, termsOfServiceId int) ([]Section, error) {
 	var sections []Section
 	s := &Section{}
-	query := "SELECT id, terms_of_service_id, title, content FROM " + s.TableName() + " WHERE terms_of_service_id = ?"
-	err := sqlx.Select(
-		qe,
+	query := "SELECT id, terms_of_service_id, title, content FROM " + s.TableName() + " WHERE terms_of_service_id = $1"
+	err := tx.Select(
 		&sections,
 		query,
 		termsOfServiceId,

@@ -2,7 +2,9 @@ package services
 
 import (
 	"context"
+	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/converters"
@@ -10,7 +12,16 @@ import (
 )
 
 func GetNews(ctx context.Context, dbClient *db.DB) ([]*models.News, error) {
-	news, err := repositories.GetAllNews(dbClient.QueryExecutor)
+	var news []repositories.News
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		news, err = repositories.GetAllNews(tx)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -24,37 +35,79 @@ func GetNews(ctx context.Context, dbClient *db.DB) ([]*models.News, error) {
 }
 
 func GetTermsAndConditions(ctx context.Context, dbClient *db.DB) (*models.TermsOfService, error) {
-	termsOfService, err := repositories.GetTermsOfService(dbClient.QueryExecutor)
+	var termsOfService repositories.TermsOfService
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		termsOfService, err = repositories.GetTermsOfService(tx)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	updatedAt, err := time.Parse(time.RFC3339, termsOfService.UpdatedAt)
 	if err != nil {
-		return nil, err
+		return &models.TermsOfService{}, err
 	}
 
-	return converters.ConvertTosRepoToSchema(&termsOfService), nil
+	return &models.TermsOfService{
+		ID:              termsOfService.Id,
+		UpdatedAt:       updatedAt,
+		Introduction:    termsOfService.Introduction,
+		Acknowledgement: termsOfService.Acknowledgement,
+	}, err
 }
 
 func GetToSSections(ctx context.Context, dbClient *db.DB, tosId int) ([]*models.Section, error) {
-	sections, err := repositories.GetToSSections(dbClient.QueryExecutor, tosId)
+	var sections []repositories.Section
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		sections, err = repositories.GetToSSections(tx, tosId)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	var result []*models.Section
 	for _, s := range sections {
-		result = append(result, converters.ConvertSectionRepoToSchema(&s))
+		result = append(result, &models.Section{
+			ID:      s.Id,
+			Title:   &s.Title,
+			Content: s.Content,
+		})
 	}
 
 	return result, nil
 }
 
 func GetToSSubsections(ctx context.Context, dbClient *db.DB, sectionId int) ([]*models.SubSection, error) {
-	subSections, err := repositories.GetToSSubsections(dbClient.QueryExecutor, sectionId)
+	var subsections []repositories.Subsection
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		subsections, err = repositories.GetToSSubsections(tx, sectionId)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	var result []*models.SubSection
-	for _, s := range subSections {
-		result = append(result, converters.ConvertSubsectionRepoToSchema(&s))
+	for _, s := range subsections {
+		result = append(result, &models.SubSection{
+			ID:      s.Id,
+			Title:   s.Title,
+			Content: *s.Content,
+		})
 	}
 
 	return result, nil

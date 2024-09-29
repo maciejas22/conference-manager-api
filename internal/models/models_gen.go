@@ -9,18 +9,45 @@ import (
 	"time"
 )
 
-type ChartTrend struct {
-	Date  time.Time `json:"date"`
-	Count int       `json:"count"`
+type AgendaItem struct {
+	ID        int       `json:"id"`
+	StartTime time.Time `json:"startTime"`
+	EndTime   time.Time `json:"endTime"`
+	Event     string    `json:"event"`
+	Speaker   string    `json:"speaker"`
+}
+
+type AgendaItemInput struct {
+	StartTime time.Time `json:"startTime"`
+	EndTime   time.Time `json:"endTime"`
+	Event     string    `json:"event"`
+	Speaker   string    `json:"speaker"`
+}
+
+type Conference struct {
+	ID                   int           `json:"id"`
+	Title                string        `json:"title"`
+	StartDate            time.Time     `json:"startDate"`
+	EndDate              time.Time     `json:"endDate"`
+	Location             string        `json:"location"`
+	Website              *string       `json:"website,omitempty"`
+	Acronym              *string       `json:"acronym,omitempty"`
+	AdditionalInfo       *string       `json:"additionalInfo,omitempty"`
+	Agenda               []*AgendaItem `json:"agenda"`
+	ParticipantsCount    int           `json:"participantsCount"`
+	ParticipantsLimit    *int          `json:"participantsLimit,omitempty"`
+	RegistrationDeadline *time.Time    `json:"registrationDeadline,omitempty"`
+	Files                []*File       `json:"files"`
+	EventsCount          int           `json:"eventsCount"`
 }
 
 type ConferenceMeta struct {
 	Page *PageInfo `json:"page"`
 }
 
-type ConferencePage struct {
-	Data []*Conference   `json:"data"`
-	Meta *ConferenceMeta `json:"meta"`
+type ConferencesFilters struct {
+	AssociatedOnly *bool   `json:"associatedOnly,omitempty"`
+	Title          *string `json:"title,omitempty"`
 }
 
 type ConferencesMetrics struct {
@@ -30,11 +57,14 @@ type ConferencesMetrics struct {
 	ParticipantsToday         int `json:"participantsToday"`
 }
 
+type ConferencesPage struct {
+	Data    []*Conference       `json:"data"`
+	Meta    *ConferenceMeta     `json:"meta"`
+	Metrics *ConferencesMetrics `json:"metrics"`
+}
+
 type CreateAgendaItemInput struct {
-	StartTime time.Time `json:"startTime"`
-	EndTime   time.Time `json:"endTime"`
-	Event     string    `json:"event"`
-	Speaker   string    `json:"speaker"`
+	CreateItem *AgendaItemInput `json:"createItem,omitempty"`
 }
 
 type CreateConferenceInput struct {
@@ -56,7 +86,13 @@ type CreateConferenceInputFile struct {
 }
 
 type DeleteFile struct {
-	ID int `json:"id"`
+	Key string `json:"key"`
+}
+
+type File struct {
+	Key  string `json:"key"`
+	URL  string `json:"url"`
+	Size int    `json:"size"`
 }
 
 type LoginUserInput struct {
@@ -65,12 +101,8 @@ type LoginUserInput struct {
 }
 
 type ModifyAgendaItemInput struct {
-	ID        *int      `json:"id,omitempty"`
-	StartTime time.Time `json:"startTime"`
-	EndTime   time.Time `json:"endTime"`
-	Event     string    `json:"event"`
-	Speaker   string    `json:"speaker"`
-	Destroy   *bool     `json:"_destroy,omitempty"`
+	CreateItem *AgendaItemInput `json:"createItem,omitempty"`
+	DeleteItem *int             `json:"deleteItem,omitempty"`
 }
 
 type ModifyConferenceInput struct {
@@ -96,16 +128,36 @@ type ModifyConferenceInputFile struct {
 type Mutation struct {
 }
 
-type OrganizerMetrics struct {
-	RunningConferences        int     `json:"runningConferences"`
-	ParticipantsCount         int     `json:"participantsCount"`
-	AverageParticipantsCount  float64 `json:"averageParticipantsCount"`
-	TotalOrganizedConferences int     `json:"totalOrganizedConferences"`
+type NewParticipantsTrend struct {
+	Date            time.Time `json:"date"`
+	NewParticipants int       `json:"newParticipants"`
 }
 
-type ParticipantsJoiningTrend struct {
-	Trend       []*ChartTrend `json:"trend"`
-	Granularity Granularity   `json:"granularity"`
+type News struct {
+	ID      int       `json:"id"`
+	Title   string    `json:"title"`
+	Content string    `json:"content"`
+	Date    time.Time `json:"date"`
+}
+
+type OrganizerMetrics struct {
+	RunningConferences        int                     `json:"runningConferences"`
+	ParticipantsCount         int                     `json:"participantsCount"`
+	AverageParticipantsCount  float64                 `json:"averageParticipantsCount"`
+	TotalOrganizedConferences int                     `json:"totalOrganizedConferences"`
+	NewParticipantsTrend      []*NewParticipantsTrend `json:"newParticipantsTrend"`
+}
+
+type Page struct {
+	Number int `json:"number"`
+	Size   int `json:"size"`
+}
+
+type PageInfo struct {
+	TotalItems int `json:"totalItems"`
+	TotalPages int `json:"totalPages"`
+	Number     int `json:"number"`
+	Size       int `json:"size"`
 }
 
 type Query struct {
@@ -115,6 +167,32 @@ type RegisterUserInput struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Role     Role   `json:"role"`
+}
+
+type Section struct {
+	ID          int           `json:"id"`
+	Title       *string       `json:"title,omitempty"`
+	Content     *string       `json:"content,omitempty"`
+	Subsections []*SubSection `json:"subsections"`
+}
+
+type Sort struct {
+	Column string `json:"column"`
+	Order  Order  `json:"order"`
+}
+
+type SubSection struct {
+	ID      int    `json:"id"`
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+type TermsOfService struct {
+	ID              int        `json:"id"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
+	Introduction    string     `json:"introduction"`
+	Acknowledgement string     `json:"acknowledgement"`
+	Sections        []*Section `json:"sections"`
 }
 
 type UpdateUserInput struct {
@@ -129,47 +207,14 @@ type UploadFile struct {
 	Base64Content string `json:"base64Content"`
 }
 
-type Granularity string
-
-const (
-	GranularityDaily   Granularity = "Daily"
-	GranularityWeekly  Granularity = "Weekly"
-	GranularityMonthly Granularity = "Monthly"
-)
-
-var AllGranularity = []Granularity{
-	GranularityDaily,
-	GranularityWeekly,
-	GranularityMonthly,
-}
-
-func (e Granularity) IsValid() bool {
-	switch e {
-	case GranularityDaily, GranularityWeekly, GranularityMonthly:
-		return true
-	}
-	return false
-}
-
-func (e Granularity) String() string {
-	return string(e)
-}
-
-func (e *Granularity) UnmarshalGQL(v interface{}) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = Granularity(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid Granularity", str)
-	}
-	return nil
-}
-
-func (e Granularity) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+type User struct {
+	ID       int               `json:"id"`
+	Name     *string           `json:"name,omitempty"`
+	Surname  *string           `json:"surname,omitempty"`
+	Username *string           `json:"username,omitempty"`
+	Email    string            `json:"email"`
+	Role     Role              `json:"role"`
+	Metrics  *OrganizerMetrics `json:"metrics,omitempty"`
 }
 
 type Order string

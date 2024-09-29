@@ -10,7 +10,7 @@ import (
 
 func Authenticated(ctx context.Context, obj interface{}, next graphql.Resolver) (interface{}, error) {
 	si := auth.GetSessionInfo(ctx)
-	if si.UserID == 0 {
+	if si.UserId == 0 {
 		return nil, gqlerror.Errorf("Unauthenticated")
 	}
 

@@ -8,7 +8,8 @@ import (
 
 type SessionInfo struct {
 	SessionId string
-	UserID    int
+	ExpiresAt string
+	UserId    int
 	Role      repositories.Role
 }
 

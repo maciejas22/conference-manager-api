@@ -1,11 +1,7 @@
 package repositories
 
 import (
-	"errors"
-	"log"
-
 	"github.com/jmoiron/sqlx"
-	"github.com/maciejas22/conference-manager/api/db"
 )
 
 type News struct {
@@ -20,18 +16,13 @@ func (n *News) TableName() string {
 	return "news"
 }
 
-func GetAllNews(qe *db.QueryExecutor) ([]News, error) {
+func GetAllNews(tx *sqlx.Tx) ([]News, error) {
 	var news []News
 	n := &News{}
 	query := "SELECT id, title, content, created_at FROM " + n.TableName() + " ORDER BY created_at DESC"
-	err := sqlx.Select(
-		qe,
-		&news,
-		query,
-	)
+	err := tx.Select(&news, query)
 	if err != nil {
-		log.Println(err)
-		return nil, errors.New("could not get news")
+		return nil, err
 	}
 	return news, nil
 }

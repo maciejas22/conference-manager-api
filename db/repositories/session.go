@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/maciejas22/conference-manager/api/db"
 )
 
 type Session struct {
@@ -19,52 +18,32 @@ func (s *Session) TableName() string {
 	return "sessions"
 }
 
-func GetSession(qe *db.QueryExecutor, sessionId string) (*Session, error) {
+func GetSession(tx *sqlx.Tx, sessionId string) (*Session, error) {
 	var session Session
 	s := &Session{}
 	query := `
     SELECT session_id, user_id, created_at, expires_at, last_accessed_at 
     FROM ` + s.TableName() + ` 
-    WHERE session_id = ?
+    WHERE session_id = $1 
   `
 
-	err := sqlx.Get(qe, &session, query, sessionId)
+	err := tx.Get(&session, query, sessionId)
 	if err != nil {
 		return nil, errors.New("could not get session")
 	}
 	return &session, nil
 }
 
-func GetUserSession(qe *db.QueryExecutor, userId int) (*Session, error) {
-	var session Session
-	s := &Session{}
-	query := `
-    SELECT session_id, user_id, created_at, expires_at, last_accessed_at 
-    FROM ` + s.TableName() + ` 
-    WHERE user_id = ?
-  `
-	err := sqlx.Get(
-		qe,
-		&session,
-		query,
-		userId,
-	)
-	if err != nil {
-		return nil, errors.New("could not get session")
-	}
-	return &session, nil
-}
-
-func CreateSession(qe *db.QueryExecutor, sessionId string, userId int) (*string, error) {
+func CreateSession(tx *sqlx.Tx, sessionId string, userId int) (*string, error) {
 	s := &Session{}
 	query := `
 		INSERT INTO ` + s.TableName() + ` (session_id, user_id, expires_at)
-		VALUES (?, ?, datetime('now', '+1 hour'))
+		VALUES ($1, $2, NOW() + INTERVAL '1 hour')
 		ON CONFLICT(user_id) DO UPDATE SET
 			session_id = excluded.session_id,
-      expires_at = datetime('now', '+1 hour')
+			expires_at = NOW() + INTERVAL '1 hour'
 	`
-	_, err := qe.Exec(
+	_, err := tx.Exec(
 		query,
 		sessionId,
 		userId,

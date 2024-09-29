@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/auth"
@@ -12,39 +13,44 @@ import (
 
 func RegisterUser(ctx context.Context, dbClient *db.DB, userData models.RegisterUserInput) (*string, error) {
 	var userSession *string
-	err := db.Transaction(ctx, dbClient.QueryExecutor, func(qe *db.QueryExecutor) error {
-		hashedPassword, err := auth.HashPassword(userData.Password)
-		if err != nil {
-			return err
-		}
+	hashedPassword, err := auth.HashPassword(userData.Password)
+	if err != nil {
+		return nil, err
+	}
 
-		userId, err := repositories.CreateUser(qe, userData.Email, hashedPassword, userData.Role.String())
+	err = db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		userId, err := repositories.CreateUser(tx, userData.Email, hashedPassword, userData.Role.String())
 		if err != nil {
 			return err
 		}
 
 		sessionId, err := auth.GenerateSessionId()
 		if err != nil {
-			return nil
+			return err
 		}
 
-		userSession, err = repositories.CreateSession(qe, sessionId, userId)
+		userSession, err = repositories.CreateSession(tx, sessionId, userId)
 		if err != nil {
 			return err
 		}
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return userSession, err
 }
 
 func LoginUser(ctx context.Context, dbClient *db.DB, userData models.LoginUserInput) (*string, error) {
 	var userSession *string
-	err := db.Transaction(ctx, dbClient.QueryExecutor, func(qe *db.QueryExecutor) error {
-		user, err := repositories.GetUserByEmail(qe, userData.Email)
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		user, err := repositories.GetUserByEmail(tx, userData.Email)
 		if err != nil {
-			return err
+			return errors.New("user not found")
 		}
 
 		if !auth.CheckPasswordHash(userData.Password, user.Password) {
@@ -56,13 +62,16 @@ func LoginUser(ctx context.Context, dbClient *db.DB, userData models.LoginUserIn
 			return errors.New("could not generate session id")
 		}
 
-		userSession, err = repositories.CreateSession(qe, sessionId, user.Id)
+		userSession, err = repositories.CreateSession(tx, sessionId, user.Id)
 		if err != nil {
-			return err
+			return errors.New("could not create session")
 		}
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return userSession, err
 }

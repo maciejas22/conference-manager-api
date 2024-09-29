@@ -2,15 +2,16 @@ package services
 
 import (
 	"context"
+	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
-	"github.com/maciejas22/conference-manager/api/internal/converters"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 )
 
 func GetParticipantsCount(ctx context.Context, dbClient *db.DB, conferenceId int) (int, error) {
-	participantsCount, err := repositories.GetConferenceParticipantsCount(dbClient.QueryExecutor, conferenceId)
+	participantsCount, err := repositories.GetConferenceParticipantsCount(dbClient.Conn, conferenceId)
 	if err != nil {
 		return 0, err
 	}
@@ -19,27 +20,52 @@ func GetParticipantsCount(ctx context.Context, dbClient *db.DB, conferenceId int
 }
 
 func AddUserToConference(ctx context.Context, dbClient *db.DB, userId int, conferenceID int) (*int, error) {
-	conference, err := repositories.AddConferenceParticipant(dbClient.QueryExecutor, conferenceID, userId)
+	var cId int
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		cId, err = repositories.AddConferenceParticipant(tx, conferenceID, userId)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	cId := int(conference.Id)
 	return &cId, nil
 }
 
 func RemoveUserFromConference(ctx context.Context, dbClient *db.DB, userId int, conferenceID int) (*int, error) {
-	conference, err := repositories.RemoveConferenceParticipant(dbClient.QueryExecutor, conferenceID, userId)
+	var cId int
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		cId, err = repositories.RemoveConferenceParticipant(tx, conferenceID, userId)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	cId := int(conference.Id)
 	return &cId, nil
 }
 
 func IsConferenceParticipant(ctx context.Context, dbClient *db.DB, userId, conferenceID int) (*bool, error) {
-	isParticipant, err := repositories.IsConferenceParticipant(dbClient.QueryExecutor, conferenceID, userId)
+	var isParticipant bool
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		isParticipant, err = repositories.IsConferenceParticipant(tx, conferenceID, userId)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +74,16 @@ func IsConferenceParticipant(ctx context.Context, dbClient *db.DB, userId, confe
 }
 
 func IsConferenceOrganizer(ctx context.Context, dbClient *db.DB, userId int, conferenceID int) (*bool, error) {
-	isOrganizer, err := repositories.IsConferenceOrganizer(dbClient.QueryExecutor, conferenceID, userId)
+	var isOrganizer bool
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		isOrganizer, err = repositories.IsConferenceOrganizer(tx, conferenceID, userId)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +92,16 @@ func IsConferenceOrganizer(ctx context.Context, dbClient *db.DB, userId int, con
 }
 
 func GetOrganizerMetrics(ctx context.Context, dbClient *db.DB, organizerId int) (*models.OrganizerMetrics, error) {
-	organizerMetrics, err := repositories.GetOrganizerLevelMetrics(dbClient.QueryExecutor, organizerId)
+	var organizerMetrics repositories.ConferenceOrganizerMetrics
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		organizerMetrics, err = repositories.GetOrganizerLevelMetrics(tx, organizerId)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -70,18 +114,33 @@ func GetOrganizerMetrics(ctx context.Context, dbClient *db.DB, organizerId int) 
 	}, nil
 }
 
-func GetParticipantsJoiningTrend(ctx context.Context, dbClient *db.DB, organizerId int) (*models.ParticipantsJoiningTrend, error) {
-	participantsJoiningTrend, err := repositories.GetParticipantsTrend(dbClient.QueryExecutor, organizerId)
+func GetParticipantsJoiningTrend(ctx context.Context, dbClient *db.DB, organizerId int) ([]*models.NewParticipantsTrend, error) {
+	var participantsJoiningTrend []repositories.TrendEntry
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		participantsJoiningTrend, err = repositories.GetParticipantsTrend(tx, organizerId)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	var trendEntries []*models.ChartTrend
-	for _, trendEntry := range participantsJoiningTrend.Trend {
-		trendEntries = append(trendEntries, converters.ConvertTrendEntryRepoToSchema(&trendEntry))
+	var trendEntries []*models.NewParticipantsTrend
+	for _, trendEntry := range participantsJoiningTrend {
+		date, err := time.Parse(time.RFC3339, trendEntry.Date)
+		if err != nil {
+			return nil, err
+		}
+
+		trendEntries = append(trendEntries, &models.NewParticipantsTrend{
+			Date:            date,
+			NewParticipants: trendEntry.Value,
+		})
 	}
-	return &models.ParticipantsJoiningTrend{
-		Trend:       trendEntries,
-		Granularity: models.Granularity(participantsJoiningTrend.Granularity),
-	}, nil
+
+	return trendEntries, nil
 }

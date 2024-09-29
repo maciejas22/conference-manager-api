@@ -1,7 +1,6 @@
 package converters
 
 import (
-	"log"
 	"time"
 
 	"github.com/maciejas22/conference-manager/api/db/repositories"
@@ -9,9 +8,8 @@ import (
 )
 
 func ConvertNewsRepoToSchema(n *repositories.News) *models.News {
-	parsedDate, err := time.Parse("2006-01-02 15:04:05", n.CreatedAt)
+	parsedDate, err := time.Parse(time.RFC3339, n.CreatedAt)
 	if err != nil {
-		log.Println("Error while parsing date: ", err)
 		return nil
 	}
 

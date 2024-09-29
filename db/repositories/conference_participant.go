@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/maciejas22/conference-manager/api/db"
 )
 
 type ConferenceParticipant struct {
@@ -17,28 +16,11 @@ func (c *ConferenceParticipant) TableName() string {
 	return "conference_participants"
 }
 
-func GetConferenceParticipants(qe *db.QueryExecutor, conferenceId int) ([]ConferenceParticipant, error) {
-	var participants []ConferenceParticipant
-	p := &ConferenceParticipant{}
-	query := "SELECT user_id, conference_id FROM " + p.TableName() + " WHERE conference_id = ?"
-	err := sqlx.Select(
-		qe,
-		&participants,
-		query,
-		conferenceId,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return participants, nil
-}
-
-func GetConferenceParticipantsCount(qe *db.QueryExecutor, conferenceId int) (int, error) {
+func GetConferenceParticipantsCount(dbc *sqlx.DB, conferenceId int) (int, error) {
 	var count int
 	p := &ConferenceParticipant{}
-	query := "SELECT COUNT(*) FROM " + p.TableName() + " WHERE conference_id = ?"
-	err := sqlx.Get(
-		qe,
+	query := "SELECT COUNT(*) FROM " + p.TableName() + " WHERE conference_id = $1"
+	err := dbc.Get(
 		&count,
 		query,
 		conferenceId,
@@ -49,44 +31,33 @@ func GetConferenceParticipantsCount(qe *db.QueryExecutor, conferenceId int) (int
 	return count, nil
 }
 
-func AddConferenceParticipant(qe *db.QueryExecutor, conferenceId int, userId int) (Conference, error) {
-	c, err := GetConference(qe, conferenceId)
-	if err != nil {
-		return Conference{}, errors.New("could not find conference")
-	}
-
+func AddConferenceParticipant(tx *sqlx.Tx, conferenceId int, userId int) (int, error) {
 	p := &ConferenceParticipant{}
-	query := "INSERT INTO " + p.TableName() + " (user_id, conference_id) VALUES (?, ?)"
-	_, err = qe.Exec(query, userId, conferenceId)
+	query := "INSERT INTO " + p.TableName() + " (user_id, conference_id) VALUES ($1, $2)"
+	_, err := tx.Exec(query, userId, conferenceId)
 	if err != nil {
-		return Conference{}, errors.New("could not insert participant")
+		return 0, errors.New("could not insert participant")
 	}
 
-	return c, nil
+	return conferenceId, nil
 }
 
-func RemoveConferenceParticipant(qe *db.QueryExecutor, conferenceId int, userId int) (Conference, error) {
-	c, err := GetConference(qe, conferenceId)
-	if err != nil {
-		return Conference{}, errors.New("could not find conference")
-	}
-
+func RemoveConferenceParticipant(tx *sqlx.Tx, conferenceId int, userId int) (int, error) {
 	p := &ConferenceParticipant{}
-	query := "DELETE FROM " + p.TableName() + " WHERE user_id = ? AND conference_id = ?"
-	_, err = qe.Exec(query, userId, conferenceId)
+	query := "DELETE FROM " + p.TableName() + " WHERE user_id = $1 AND conference_id = $2"
+	_, err := tx.Exec(query, userId, conferenceId)
 	if err != nil {
-		return Conference{}, errors.New("could not delete participant")
+		return 0, errors.New("could not delete participant")
 	}
 
-	return c, nil
+	return conferenceId, nil
 }
 
-func IsConferenceParticipant(qe *db.QueryExecutor, conferenceId int, userId int) (bool, error) {
+func IsConferenceParticipant(tx *sqlx.Tx, conferenceId int, userId int) (bool, error) {
 	var count int
 	p := &ConferenceParticipant{}
-	query := "SELECT COUNT(*) FROM " + p.TableName() + " WHERE conference_id = ? AND user_id = ?"
-	err := sqlx.Get(
-		qe,
+	query := "SELECT COUNT(*) FROM " + p.TableName() + " WHERE conference_id = $1 AND user_id = $2"
+	err := tx.Get(
 		&count,
 		query,
 		conferenceId,

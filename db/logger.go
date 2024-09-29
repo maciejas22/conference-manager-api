@@ -2,73 +2,60 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"log/slog"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/tracelog"
 )
 
-type QueryExecutor struct {
-	queryer sqlx.Queryer
-	execer  sqlx.Execer
-	logger  *slog.Logger
+type Logger struct {
+	l *slog.Logger
 }
 
-func printQuery(l *slog.Logger, query string, args ...interface{}) {
-	argsStr := fmt.Sprintf("%v", args...)
-	l.Debug("", slog.String("query", query), slog.String("args", argsStr))
+func NewLogger(l *slog.Logger) *Logger {
+	return &Logger{l: l}
 }
 
-func (p *QueryExecutor) Query(query string, args ...interface{}) (*sql.Rows, error) {
-	printQuery(p.logger, query, args...)
-	res, err := p.queryer.Query(query, args...)
-	if err != nil {
-		p.logger.Error("failed to execute query", "error", err)
+func (l *Logger) Log(ctx context.Context, level tracelog.LogLevel, msg string, data map[string]interface{}) {
+	attrs := make([]slog.Attr, 0, len(data))
+	for k, v := range data {
+		attrs = append(attrs, slog.Any(k, v))
 	}
-	return res, err
-}
 
-func (p *QueryExecutor) Queryx(query string, args ...interface{}) (*sqlx.Rows, error) {
-	printQuery(p.logger, query, args...)
-	res, err := p.queryer.Queryx(query, args...)
-	if err != nil {
-		p.logger.Error("failed to execute query", "error", err)
+	var lvl slog.Level
+	switch level {
+	case tracelog.LogLevelTrace:
+		lvl = slog.LevelDebug - 1
+		attrs = append(attrs, slog.Any("PGX_LOG_LEVEL", level))
+	case tracelog.LogLevelDebug:
+		lvl = slog.LevelDebug
+	case tracelog.LogLevelInfo:
+		lvl = slog.LevelInfo
+	case tracelog.LogLevelWarn:
+		lvl = slog.LevelWarn
+	case tracelog.LogLevelError:
+		lvl = slog.LevelError
+	default:
+		lvl = slog.LevelError
+		attrs = append(attrs, slog.Any("INVALID_PGX_LOG_LEVEL", level))
 	}
-	return res, err
+	l.l.LogAttrs(ctx, lvl, msg, attrs...)
 }
 
-func (p *QueryExecutor) QueryRowx(query string, args ...interface{}) *sqlx.Row {
-	printQuery(p.logger, query, args...)
-	row := p.queryer.QueryRowx(query, args...)
-	if row.Err() != nil {
-		p.logger.Error("failed to execute query", "error", row.Err())
+type MultiQueryTracer struct {
+	Tracers []pgx.QueryTracer
+}
+
+func (m *MultiQueryTracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	for _, t := range m.Tracers {
+		ctx = t.TraceQueryStart(ctx, conn, data)
 	}
-	return row
+
+	return ctx
 }
 
-func (p *QueryExecutor) Exec(query string, args ...interface{}) (sql.Result, error) {
-	printQuery(p.logger, query, args...)
-	res, err := p.execer.Exec(query, args...)
-	if err != nil {
-		p.logger.Error("failed to execute query", "error", err)
-	}
-	return res, err
-}
-
-func (ql *QueryExecutor) BeginTxx(ctx context.Context, opts *sql.TxOptions) (*sqlx.Tx, error) {
-	tx, err := ql.queryer.(*sqlx.DB).BeginTxx(ctx, opts)
-	if err != nil {
-		ql.logger.Error("failed to begin transaction", "error", err)
-		return nil, err
-	}
-	return tx, err
-}
-
-func (ql *QueryExecutor) WithTx(tx *sqlx.Tx) *QueryExecutor {
-	return &QueryExecutor{
-		queryer: tx,
-		execer:  tx,
-		logger:  ql.logger,
+func (m *MultiQueryTracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryEndData) {
+	for _, t := range m.Tracers {
+		t.TraceQueryEnd(ctx, conn, data)
 	}
 }

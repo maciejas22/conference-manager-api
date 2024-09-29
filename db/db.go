@@ -2,36 +2,50 @@ package db
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/tracelog"
 	"github.com/jmoiron/sqlx"
 	"github.com/maciejas22/conference-manager/api/internal/config"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 type DB struct {
-	Logger        *slog.Logger
-	QueryExecutor *QueryExecutor
-	Conn          *sqlx.DB
+	Logger *slog.Logger
+	Conn   *sqlx.DB
+}
+
+func GetDriverConfig(l *slog.Logger) *pgx.ConnConfig {
+	connConfig, _ := pgx.ParseConfig(config.AppConfig.DatabaseURL)
+	adapterLogger := NewLogger(l)
+	m := MultiQueryTracer{
+		Tracers: []pgx.QueryTracer{
+			&tracelog.TraceLog{
+				Logger:   adapterLogger,
+				LogLevel: tracelog.LogLevelTrace,
+			},
+		},
+	}
+	connConfig.Tracer = &m
+	return connConfig
 }
 
 func Connect(ctx context.Context, logger *slog.Logger) (*DB, error) {
-	connStr := config.AppConfig.DatabaseURL
+	dc := GetDriverConfig(logger)
+	connStr := stdlib.RegisterConnConfig(dc)
 
-	db, err := sqlx.Connect("sqlite3", connStr)
+	conn, err := sqlx.Connect("pgx", connStr)
 	if err != nil {
 		logger.Error("failed to connect to db", "error", err)
-		return nil, err
+		return nil, errors.New("failed to connect to db")
 	}
 
 	return &DB{
-		Conn:   db,
+		Conn:   conn,
 		Logger: logger,
-		QueryExecutor: &QueryExecutor{
-			queryer: db,
-			execer:  db,
-			logger:  logger,
-		},
 	}, nil
 }
 
@@ -45,28 +59,22 @@ func (db *DB) Close() (err error) {
 	return nil
 }
 
-func Transaction(ctx context.Context, ql *QueryExecutor, fn func(*QueryExecutor) error) error {
-	tx, err := ql.BeginTxx(ctx, nil)
+func Transaction(ctx context.Context, db *sqlx.DB, fn func(*sqlx.Tx) error) error {
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
-		ql.logger.Error("failed to begin transaction", "error", err)
 		return err
 	}
 
-	txLogger := ql.WithTx(tx)
-
-	err = fn(txLogger)
+	err = fn(tx)
 
 	if err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
-			ql.logger.Error("failed to rollback transaction", "error", rbErr)
 			return rbErr
 		}
-		ql.logger.Error("transaction failed", "error", err)
 		return err
 	}
 
 	if err := tx.Commit(); err != nil {
-		ql.logger.Error("failed to commit transaction", "error", err)
 		return err
 	}
 

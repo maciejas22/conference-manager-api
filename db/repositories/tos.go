@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"github.com/jmoiron/sqlx"
-	"github.com/maciejas22/conference-manager/api/db"
 )
 
 type TermsOfService struct {
@@ -17,12 +16,11 @@ func (t *TermsOfService) TableName() string {
 	return "terms_of_service"
 }
 
-func GetTermsOfService(qe *db.QueryExecutor) (TermsOfService, error) {
+func GetTermsOfService(tx *sqlx.Tx) (TermsOfService, error) {
 	var term TermsOfService
 	query := "SELECT id, updated_at, introduction, acknowledgement FROM " + term.TableName() + " LIMIT 1"
 
-	err := sqlx.Get(
-		qe,
+	err := tx.Get(
 		&term,
 		query,
 	)

@@ -65,8 +65,8 @@ resolver:
 
 # gqlgen will search for any type names in the schema in these go packages
 # if they match it will use them, otherwise it will generate them.
-autobind:
-  - "github.com/maciejas22/conference-manager/api/internal/models"
+# autobind:
+#   - "github.com/maciejas22/conference-manager/api/internal/models"
 
 # This section declares type mapping between the GraphQL and go type systems
 #
@@ -84,6 +84,28 @@ models:
       - github.com/99designs/gqlgen/graphql.Int
       - github.com/99designs/gqlgen/graphql.Int64
       - github.com/99designs/gqlgen/graphql.Int32
+  User:
+    fields:
+      metrics:
+        resolver: true
+  OrganizerMetrics:
+    fields:
+      newParticipantsTrend:
+        resolver: true
+  Conference:
+    fields:
+      agenda:
+        resolver: true
+      files:
+        resolver: true
+      participantsCount:
+        resolver: true
+      eventsCount:
+        resolver: true
+  ConferencesPage:
+    fields:
+      metrics:
+        resolver: true
   TermsOfService:
     fields:
       sections:

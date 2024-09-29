@@ -24,8 +24,7 @@ func NewS3Client(logger *slog.Logger) (*S3Client, error) {
 }
 
 type File struct {
-	ID   string
-	Name string
+	Key  string
 	Size int64
 	URL  string
 }
@@ -61,8 +60,7 @@ func (client *S3Client) GetFilesFromFolder(bucket string, folder string) ([]File
 		url := fmt.Sprintf("%s/%s/%s", config.AppConfig.S3Endpoint, bucket, *item.Key)
 
 		file := File{
-			ID:   *item.Key,
-			Name: *item.Key,
+			Key:  *item.Key,
 			Size: *item.Size,
 			URL:  url,
 		}
