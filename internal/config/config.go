@@ -11,7 +11,6 @@ type Config struct {
 	GoEnv                    string   `mapstructure:"GO_ENV"`
 	ServerPort               string   `mapstructure:"SERVER_PORT"`
 	CorsAllowedOrigins       []string `mapstructure:"CORS_ALLOWED_ORIGINS"`
-	JWTSecret                string   `mapstructure:"JWT_SECRET"`
 	DatabaseURL              string   `mapstructure:"DATABASE_URL"`
 	S3Region                 string   `mapstructure:"S3_REGION"`
 	S3Endpoint               string   `mapstructure:"S3_ENDPOINT"`
