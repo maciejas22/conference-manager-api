@@ -13,7 +13,7 @@ type TermsOfService struct {
 }
 
 func (t *TermsOfService) TableName() string {
-	return "terms_of_service"
+	return "public.terms_of_service"
 }
 
 func GetTermsOfService(tx *sqlx.Tx) (TermsOfService, error) {

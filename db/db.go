@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"errors"
+	"log"
 	"log/slog"
 
 	"github.com/jackc/pgx/v5"
@@ -20,6 +21,7 @@ type DB struct {
 
 func GetDriverConfig(l *slog.Logger) *pgx.ConnConfig {
 	connConfig, _ := pgx.ParseConfig(config.AppConfig.DatabaseURL)
+	l.Info("Connecting to database", "url", config.AppConfig.DatabaseURL)
 	adapterLogger := NewLogger(l)
 	m := MultiQueryTracer{
 		Tracers: []pgx.QueryTracer{
@@ -62,19 +64,23 @@ func (db *DB) Close() (err error) {
 func Transaction(ctx context.Context, db *sqlx.DB, fn func(*sqlx.Tx) error) error {
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
+		log.Println("Error in transaction ", err)
 		return err
 	}
 
 	err = fn(tx)
 
 	if err != nil {
+		log.Println("Error in transaction2 ", err)
 		if rbErr := tx.Rollback(); rbErr != nil {
+			log.Println("Error in transaction rollback ", rbErr)
 			return rbErr
 		}
 		return err
 	}
 
 	if err := tx.Commit(); err != nil {
+		log.Println("Error in transaction commit ", err)
 		return err
 	}
 

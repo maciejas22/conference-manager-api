@@ -13,7 +13,7 @@ type ConferenceParticipant struct {
 }
 
 func (c *ConferenceParticipant) TableName() string {
-	return "conference_participants"
+	return "public.conference_participants"
 }
 
 func GetConferenceParticipantsCount(dbc *sqlx.DB, conferenceId int) (int, error) {

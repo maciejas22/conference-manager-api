@@ -25,7 +25,7 @@ type Conference struct {
 }
 
 func (c *Conference) TableName() string {
-	return "conferences"
+	return "public.conferences"
 }
 
 type ConferenceFilter struct {

@@ -28,7 +28,7 @@ type User struct {
 }
 
 func (u *User) TableName() string {
-	return "users"
+	return "public.users"
 }
 
 func GetUserByID(tx *sqlx.Tx, id int) (User, error) {
