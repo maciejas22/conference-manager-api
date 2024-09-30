@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"errors"
+	"log"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -15,7 +16,7 @@ type Session struct {
 }
 
 func (s *Session) TableName() string {
-	return "sessions"
+	return "public.sessions"
 }
 
 func GetSession(tx *sqlx.Tx, sessionId string) (*Session, error) {
@@ -29,6 +30,7 @@ func GetSession(tx *sqlx.Tx, sessionId string) (*Session, error) {
 
 	err := tx.Get(&session, query, sessionId)
 	if err != nil {
+		log.Println(err)
 		return nil, errors.New("could not get session")
 	}
 	return &session, nil

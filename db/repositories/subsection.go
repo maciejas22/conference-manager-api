@@ -16,7 +16,7 @@ type Subsection struct {
 }
 
 func (s *Subsection) TableName() string {
-	return "subsections"
+	return "public.subsections"
 }
 
 func GetToSSubsections(tx *sqlx.Tx, sectionId int) ([]Subsection, error) {

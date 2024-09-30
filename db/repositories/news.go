@@ -13,7 +13,7 @@ type News struct {
 }
 
 func (n *News) TableName() string {
-	return "news"
+	return "public.news"
 }
 
 func GetAllNews(tx *sqlx.Tx) ([]News, error) {

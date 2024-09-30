@@ -16,7 +16,7 @@ type AgendaItem struct {
 }
 
 func (a *AgendaItem) TableName() string {
-	return "agenda"
+	return "public.agenda"
 }
 
 func GetAgenda(tx *sqlx.Tx, conferenceId int) ([]AgendaItem, error) {

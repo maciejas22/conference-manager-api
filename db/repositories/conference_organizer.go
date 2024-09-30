@@ -13,7 +13,7 @@ type ConferenceOrganizer struct {
 }
 
 func (c *ConferenceOrganizer) TableName() string {
-	return "conference_organizers"
+	return "public.conference_organizers"
 }
 
 func IsConferenceOrganizer(tx *sqlx.Tx, conferenceId int, userId int) (bool, error) {

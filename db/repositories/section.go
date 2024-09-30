@@ -14,7 +14,7 @@ type Section struct {
 }
 
 func (s *Section) TableName() string {
-	return "sections"
+	return "public.sections"
 }
 
 func GetToSSections(tx *sqlx.Tx, termsOfServiceId int) ([]Section, error) {
