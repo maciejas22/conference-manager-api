@@ -5,9 +5,8 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/maciejas22/conference-manager/api/db"
-	"github.com/maciejas22/conference-manager/api/db/repositories"
-	"github.com/maciejas22/conference-manager/api/internal/converters"
+	"github.com/maciejas22/conference-manager/api/internal/db"
+	"github.com/maciejas22/conference-manager/api/internal/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 )
 
@@ -28,7 +27,18 @@ func GetNews(ctx context.Context, dbClient *db.DB) ([]*models.News, error) {
 
 	var result []*models.News
 	for _, n := range news {
-		result = append(result, converters.ConvertNewsRepoToSchema(&n))
+		parsedDate, err := time.Parse(time.RFC3339, n.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result,
+			&models.News{
+				ID:      n.Id,
+				Title:   n.Title,
+				Content: n.Content,
+				Date:    parsedDate,
+			})
 	}
 
 	return result, nil
