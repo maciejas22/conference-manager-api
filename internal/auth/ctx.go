@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 
-	"github.com/maciejas22/conference-manager/api/db/repositories"
+	"github.com/maciejas22/conference-manager/api/internal/db/repositories"
 )
 
 type SessionInfo struct {

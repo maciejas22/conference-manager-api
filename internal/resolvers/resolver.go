@@ -3,7 +3,7 @@ package resolvers
 import (
 	"context"
 
-	"github.com/maciejas22/conference-manager/api/db"
+	"github.com/maciejas22/conference-manager/api/internal/db"
 	"github.com/maciejas22/conference-manager/api/pkg/s3"
 )
 

@@ -13,8 +13,8 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
 
-	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/internal/config"
+	"github.com/maciejas22/conference-manager/api/internal/db"
 	"github.com/maciejas22/conference-manager/api/internal/directives"
 	"github.com/maciejas22/conference-manager/api/internal/graph"
 	"github.com/maciejas22/conference-manager/api/internal/middlewares"

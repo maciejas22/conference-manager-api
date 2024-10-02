@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/maciejas22/conference-manager/api/db"
-	"github.com/maciejas22/conference-manager/api/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/auth"
+	"github.com/maciejas22/conference-manager/api/internal/db"
+	"github.com/maciejas22/conference-manager/api/internal/db/repositories"
 )
 
 const (

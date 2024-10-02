@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	filters "github.com/maciejas22/conference-manager/api/db/repositories/shared"
+	filters "github.com/maciejas22/conference-manager/api/internal/db/repositories/shared"
 )
 
 type Conference struct {
