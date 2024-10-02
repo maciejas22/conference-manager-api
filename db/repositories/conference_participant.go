@@ -16,11 +16,11 @@ func (c *ConferenceParticipant) TableName() string {
 	return "public.conference_participants"
 }
 
-func GetConferenceParticipantsCount(dbc *sqlx.DB, conferenceId int) (int, error) {
+func GetConferenceParticipantsCount(tx *sqlx.Tx, conferenceId int) (int, error) {
 	var count int
 	p := &ConferenceParticipant{}
 	query := "SELECT COUNT(*) FROM " + p.TableName() + " WHERE conference_id = $1"
-	err := dbc.Get(
+	err := tx.Get(
 		&count,
 		query,
 		conferenceId,

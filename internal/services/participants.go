@@ -8,10 +8,20 @@ import (
 	"github.com/maciejas22/conference-manager/api/db"
 	"github.com/maciejas22/conference-manager/api/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/models"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 func GetParticipantsCount(ctx context.Context, dbClient *db.DB, conferenceId int) (int, error) {
-	participantsCount, err := repositories.GetConferenceParticipantsCount(dbClient.Conn, conferenceId)
+	var participantsCount int
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		var err error
+		participantsCount, err = repositories.GetConferenceParticipantsCount(tx, conferenceId)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -23,6 +33,31 @@ func AddUserToConference(ctx context.Context, dbClient *db.DB, userId int, confe
 	var cId int
 	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
 		var err error
+
+		participantsCount, err := repositories.GetConferenceParticipantsCount(tx, conferenceID)
+		if err != nil {
+			return err
+		}
+		conference, err := repositories.GetConference(tx, conferenceID)
+		if err != nil {
+			return err
+		}
+
+		if conference.ParticipantsLimit != nil && participantsCount >= *conference.ParticipantsLimit {
+			return gqlerror.Errorf("Conference is full")
+		}
+
+		if conference.RegistrationDeadline != nil {
+			registrationDeadline, err := time.Parse(time.RFC3339, *conference.RegistrationDeadline)
+			if err != nil {
+				return err
+			}
+
+			if time.Now().After(registrationDeadline) {
+				return gqlerror.Errorf("Registration deadline has passed")
+			}
+		}
+
 		cId, err = repositories.AddConferenceParticipant(tx, conferenceID, userId)
 		if err != nil {
 			return err
@@ -31,6 +66,9 @@ func AddUserToConference(ctx context.Context, dbClient *db.DB, userId int, confe
 		return nil
 	})
 	if err != nil {
+		if _, ok := err.(*gqlerror.Error); !ok {
+			return nil, gqlerror.Errorf("Failed to add user to conference")
+		}
 		return nil, err
 	}
 

@@ -95,10 +95,14 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, updateUserInput model
 
 func (r *mutationResolver) EditPassword(ctx context.Context, password string) (*bool, error) {
 	si := auth.GetSessionInfo(ctx)
+	hashedPassword, err := auth.HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
 
-	err := db.Transaction(ctx, r.dbClient.Conn, func(tx *sqlx.Tx) error {
+	err = db.Transaction(ctx, r.dbClient.Conn, func(tx *sqlx.Tx) error {
 		_, err := repositories.UpdateUser(tx, si.UserId, repositories.UpdateUserInput{
-			Password: &password,
+			Password: &hashedPassword,
 		})
 		if err != nil {
 			return err
