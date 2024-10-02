@@ -66,7 +66,7 @@ func (r *mutationResolver) AddUserToConference(ctx context.Context, conferenceID
 	si := auth.GetSessionInfo(ctx)
 	cId, err := services.AddUserToConference(ctx, r.dbClient, si.UserId, conferenceID)
 	if err != nil {
-		return 0, gqlerror.Errorf("Failed to add user to conference")
+		return 0, err
 	}
 	return *cId, nil
 }
