@@ -159,7 +159,7 @@ func GetAllConferences(ctx context.Context, dbClient *db.DB, userId int, p *mode
 	var m filters.PaginationMeta
 
 	var page filters.Page
-	if p != nil {
+	if p == nil {
 		page = filters.Page{
 			PageNumber: 1,
 			PageSize:   10,
