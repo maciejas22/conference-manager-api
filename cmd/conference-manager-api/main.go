@@ -59,7 +59,7 @@ func main() {
 	}
 	defer db.Close()
 
-	s3, err := s3.NewS3Client(logger)
+	s3, err := s3.NewS3Client(ctx, logger)
 	if err != nil {
 		logger.Error("failed to connect to s3", "error", err)
 	}

@@ -3,6 +3,7 @@ package files
 import (
 	"context"
 	"io"
+	"log"
 	"strconv"
 
 	"github.com/maciejas22/conference-manager/api/internal/config"
@@ -15,7 +16,7 @@ func createKey(conferenceId int, fileName string) string {
 }
 
 func GetConferenceFiles(ctx context.Context, s3 *s3.S3Client, conferenceId int) ([]*models.File, error) {
-	files, err := s3.GetFilesFromFolder(config.AppConfig.S3BucketsConferenceFiles, strconv.Itoa(conferenceId))
+	files, err := s3.GetFilesFromFolder(ctx, config.AppConfig.AWSBucketsConferenceFiles, strconv.Itoa(conferenceId))
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +33,7 @@ func GetConferenceFiles(ctx context.Context, s3 *s3.S3Client, conferenceId int) 
 }
 
 func UploadConferenceFile(ctx context.Context, s3 *s3.S3Client, conferenceId int, fileName string, fileContent io.ReadSeeker) error {
-	err := s3.UploadFile(config.AppConfig.S3BucketsConferenceFiles, createKey(conferenceId, fileName), fileContent)
+	err := s3.UploadFile(ctx, config.AppConfig.AWSBucketsConferenceFiles, createKey(conferenceId, fileName), fileContent)
 	if err != nil {
 		return err
 	}
@@ -41,5 +42,6 @@ func UploadConferenceFile(ctx context.Context, s3 *s3.S3Client, conferenceId int
 }
 
 func DeleteConferenceFile(ctx context.Context, s3 *s3.S3Client, fileKey string) error {
-	return s3.DeleteFile(config.AppConfig.S3BucketsConferenceFiles, fileKey)
+	log.Printf("Deleting file with key: %s", fileKey)
+	return s3.DeleteFile(ctx, config.AppConfig.AWSBucketsConferenceFiles, fileKey)
 }

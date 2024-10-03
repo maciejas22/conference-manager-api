@@ -2,22 +2,22 @@ package config
 
 import (
 	"log"
+	"os"
 
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	Port                     int      `mapstructure:"SERVER_PORT"`
-	GoEnv                    string   `mapstructure:"GO_ENV"`
-	ServerPort               string   `mapstructure:"SERVER_PORT"`
-	CorsAllowedOrigins       []string `mapstructure:"CORS_ALLOWED_ORIGINS"`
-	DatabaseURL              string   `mapstructure:"DATABASE_URL"`
-	S3Region                 string   `mapstructure:"S3_REGION"`
-	S3Endpoint               string   `mapstructure:"S3_ENDPOINT"`
-	S3AccessKeyId            string   `mapstructure:"S3_ACCESS_KEY_ID"`
-	S3SecretAccessKey        string   `mapstructure:"S3_SECRET_ACCESS_KEY"`
-	S3UrlLifetimeInHours     int      `mapstructure:"S3_URL_LIFETIME_IN_HOURS"`
-	S3BucketsConferenceFiles string   `mapstructure:"S3_BUCKETS_CONFERENCE_FILES"`
+	Port                      int      `mapstructure:"SERVER_PORT"`
+	GoEnv                     string   `mapstructure:"GO_ENV"`
+	ServerPort                string   `mapstructure:"SERVER_PORT"`
+	CorsAllowedOrigins        []string `mapstructure:"CORS_ALLOWED_ORIGINS"`
+	DatabaseURL               string   `mapstructure:"DATABASE_URL"`
+	AWSRegion                 string   `mapstructure:"AWS_REGION"`
+	AWSEndpoint               string   `mapstructure:"AWS_ENDPOINT_URL_S3"`
+	AWSAccessKeyId            string   `mapstructure:"AWS_ACCESS_KEY_ID"`
+	AWSSecretAccessKey        string   `mapstructure:"AWS_SECRET_ACCESS_KEY"`
+	AWSBucketsConferenceFiles string   `mapstructure:"AWS_BUCKETS_CONFERENCE_FILES"`
 }
 
 var AppConfig *Config
@@ -32,6 +32,13 @@ const (
 	EnvProdFile   = ".env.prod"
 	EnvDevFile    = ".env.dev"
 )
+
+func setAWSConfig() {
+	os.Setenv("AWS_REGION", AppConfig.AWSRegion)
+	os.Setenv("AWS_ENDPOINT_URL_S3", AppConfig.AWSEndpoint)
+	os.Setenv("AWS_ACCESS_KEY_ID", AppConfig.AWSAccessKeyId)
+	os.Setenv("AWS_SECRET_ACCESS_KEY", AppConfig.AWSSecretAccessKey)
+}
 
 func LoadConfig() {
 	viper.AutomaticEnv()
@@ -67,4 +74,5 @@ func LoadConfig() {
 
 	log.Printf("app is running in %s mode\n", env)
 	log.Printf("cors allowed origins: %v\n", AppConfig.CorsAllowedOrigins)
+	setAWSConfig()
 }
