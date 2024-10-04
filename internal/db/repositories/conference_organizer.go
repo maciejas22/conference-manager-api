@@ -91,48 +91,49 @@ type TrendEntry struct {
 func GetParticipantsTrend(tx *sqlx.Tx, organizerId int) ([]TrendEntry, error) {
 	var counts []TrendEntry
 
-	var latestConference Conference
+	var reportStartDate time.Time
 	query := `
-		SELECT c.*
-		FROM ` + latestConference.TableName() + ` c
-		JOIN ` + (new(ConferenceOrganizer)).TableName() + ` o ON c.id = o.conference_id
-		WHERE o.user_id = $1 AND c.start_date <= NOW() AND c.end_date >= NOW()
-		ORDER BY c.start_date DESC
-		LIMIT 1
-	`
-	err := tx.Get(&latestConference, query, organizerId)
+	  SELECT MIN(c.start_date)
+	  FROM ` + (new(Conference)).TableName() + ` c
+	  JOIN ` + (new(ConferenceOrganizer)).TableName() + ` o ON c.id = o.conference_id
+	  WHERE o.user_id = $1 AND c.start_date <= NOW() AND c.end_date >= NOW()
+  `
+	err := tx.Get(&reportStartDate, query, organizerId)
 	if err != nil {
-		return counts, nil
+		return counts, err
 	}
 
-	startTime, _ := time.Parse(time.RFC3339, latestConference.StartDate)
-	endTime := time.Now()
-	totalDuration := endTime.Sub(startTime)
-
-	var interval time.Duration
-	if totalDuration.Hours() <= 24 {
-		interval = 24 * time.Hour / 10
-	} else {
-		interval = totalDuration / 10
+	totalDuration := time.Since(reportStartDate)
+	interval := totalDuration / 10
+	if interval.Hours() < 24 {
+		interval = 24 * time.Hour
 	}
 
-	for t := startTime; t.Before(endTime); t = t.Add(interval) {
-		var count int
-		query = `
-			SELECT COUNT(*)
-			FROM public.conference_participants
-			WHERE conference_id = $1 AND joined_at >= $2 AND joined_at < $3 
-		`
-		nextTime := t.Add(interval)
-		err := tx.Get(&count, query, latestConference.Id, t, nextTime)
-		if err != nil {
-			return nil, err
-		}
+	query = `
+	  WITH intervals AS (
+	  	SELECT generate_series(
+	  		$1::timestamp,
+        $2::timestamp,
+	  		$3::interval
+	  	) start_time
+	  )
+	  SELECT
+	  	i.start_time AS date,
+	  	COALESCE(COUNT(cp.conference_id), 0) AS value 
+	  FROM intervals i
+	  LEFT JOIN ` + (new(ConferenceParticipant)).TableName() + ` cp
+	  	ON cp.joined_at >= i.start_time
+	  	AND cp.joined_at < i.start_time + $3::interval
+	  LEFT JOIN ` + (new(ConferenceOrganizer)).TableName() + ` o
+	  	ON cp.conference_id = o.conference_id
+	  WHERE o.user_id = $4 OR cp.conference_id IS NULL
+	  GROUP BY i.start_time
+	  ORDER BY i.start_time ASC
+  `
 
-		counts = append(counts, TrendEntry{
-			Date:  t.Format(time.RFC3339),
-			Value: count,
-		})
+	err = tx.Select(&counts, query, reportStartDate, time.Now(), interval.String(), organizerId)
+	if err != nil {
+		return counts, err
 	}
 
 	return counts, nil
