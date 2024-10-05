@@ -113,8 +113,8 @@ func GetParticipantsTrend(tx *sqlx.Tx, organizerId int) ([]TrendEntry, error) {
 	  WITH intervals AS (
 	  	SELECT generate_series(
 	  		$1::timestamp,
-        $2::timestamp,
-	  		$3::interval
+        NOW(),
+	  		$2::interval
 	  	) start_time
 	  )
 	  SELECT
@@ -123,15 +123,15 @@ func GetParticipantsTrend(tx *sqlx.Tx, organizerId int) ([]TrendEntry, error) {
 	  FROM intervals i
 	  LEFT JOIN ` + (new(ConferenceParticipant)).TableName() + ` cp
 	  	ON cp.joined_at >= i.start_time
-	  	AND cp.joined_at < i.start_time + $3::interval
+	  	AND cp.joined_at < i.start_time + $2::interval
 	  LEFT JOIN ` + (new(ConferenceOrganizer)).TableName() + ` o
 	  	ON cp.conference_id = o.conference_id
-	  WHERE o.user_id = $4 OR cp.conference_id IS NULL
+	  WHERE o.user_id = $3 OR cp.conference_id IS NULL
 	  GROUP BY i.start_time
 	  ORDER BY i.start_time ASC
   `
 
-	err = tx.Select(&counts, query, reportStartDate, time.Now(), interval.String(), organizerId)
+	err = tx.Select(&counts, query, reportStartDate, interval.String(), organizerId)
 	if err != nil {
 		return counts, err
 	}
