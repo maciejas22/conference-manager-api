@@ -1,7 +1,10 @@
 package repositories
 
 import (
+	"log"
+
 	"github.com/jmoiron/sqlx"
+	filters "github.com/maciejas22/conference-manager/api/internal/db/repositories/shared"
 )
 
 type News struct {
@@ -16,13 +19,38 @@ func (n *News) TableName() string {
 	return "public.news"
 }
 
-func GetAllNews(tx *sqlx.Tx) ([]News, error) {
+func GetNews(tx *sqlx.Tx, page filters.Page) ([]News, filters.PaginationMeta, error) {
 	var news []News
-	n := &News{}
-	query := "SELECT id, title, content, created_at FROM " + n.TableName() + " ORDER BY created_at DESC"
-	err := tx.Select(&news, query)
+
+	offset := (page.PageNumber - 1) * page.PageSize
+	log.Println("offset", offset)
+
+	var totalItems int
+	countQuery := "SELECT COUNT(*) FROM " + (new(News)).TableName()
+	err := tx.Get(&totalItems, countQuery)
 	if err != nil {
-		return nil, err
+		return nil, filters.PaginationMeta{}, err
 	}
-	return news, nil
+
+	totalPages := (totalItems + page.PageSize - 1) / page.PageSize
+
+	query := `
+		SELECT id, title, content, created_at
+		FROM ` + (new(News)).TableName() + `
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2 
+	`
+	err = tx.Select(&news, query, page.PageSize, offset)
+	if err != nil {
+		return nil, filters.PaginationMeta{}, err
+	}
+
+	paginationMeta := filters.PaginationMeta{
+		PageNumber: page.PageNumber,
+		PageSize:   page.PageSize,
+		TotalItems: totalItems,
+		TotalPages: totalPages,
+	}
+
+	return news, paginationMeta, nil
 }

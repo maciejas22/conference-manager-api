@@ -127,6 +127,15 @@ type ComplexityRoot struct {
 		Title   func(childComplexity int) int
 	}
 
+	NewsMeta struct {
+		Page func(childComplexity int) int
+	}
+
+	NewsPage struct {
+		Data func(childComplexity int) int
+		Meta func(childComplexity int) int
+	}
+
 	OrganizerMetrics struct {
 		AverageParticipantsCount  func(childComplexity int) int
 		NewParticipantsTrend      func(childComplexity int) int
@@ -146,7 +155,7 @@ type ComplexityRoot struct {
 		Conference                     func(childComplexity int, id int) int
 		Conferences                    func(childComplexity int, page *models.Page, sort *models.Sort, filters *models.ConferencesFilters) int
 		IsUserAssociatedWithConference func(childComplexity int, conferenceID int) int
-		News                           func(childComplexity int) int
+		News                           func(childComplexity int, page *models.Page) int
 		TermsAndConditions             func(childComplexity int) int
 		User                           func(childComplexity int) int
 	}
@@ -210,7 +219,7 @@ type OrganizerMetricsResolver interface {
 type QueryResolver interface {
 	Conference(ctx context.Context, id int) (*models.Conference, error)
 	Conferences(ctx context.Context, page *models.Page, sort *models.Sort, filters *models.ConferencesFilters) (*models.ConferencesPage, error)
-	News(ctx context.Context) ([]*models.News, error)
+	News(ctx context.Context, page *models.Page) (*models.NewsPage, error)
 	TermsAndConditions(ctx context.Context) (*models.TermsOfService, error)
 	User(ctx context.Context) (*models.User, error)
 	IsUserAssociatedWithConference(ctx context.Context, conferenceID int) (bool, error)
@@ -599,6 +608,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.News.Title(childComplexity), true
 
+	case "NewsMeta.page":
+		if e.complexity.NewsMeta.Page == nil {
+			break
+		}
+
+		return e.complexity.NewsMeta.Page(childComplexity), true
+
+	case "NewsPage.data":
+		if e.complexity.NewsPage.Data == nil {
+			break
+		}
+
+		return e.complexity.NewsPage.Data(childComplexity), true
+
+	case "NewsPage.meta":
+		if e.complexity.NewsPage.Meta == nil {
+			break
+		}
+
+		return e.complexity.NewsPage.Meta(childComplexity), true
+
 	case "OrganizerMetrics.averageParticipantsCount":
 		if e.complexity.OrganizerMetrics.AverageParticipantsCount == nil {
 			break
@@ -703,7 +733,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.Query.News(childComplexity), true
+		args, err := ec.field_Query_news_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.News(childComplexity, args["page"].(*models.Page)), true
 
 	case "Query.termsAndConditions":
 		if e.complexity.Query.TermsAndConditions == nil {
@@ -1097,6 +1132,15 @@ extend type Mutation {
   date: Time!
 }
 
+type NewsPage {
+  data: [News!]!
+  meta: NewsMeta!
+}
+
+type NewsMeta {
+  page: PageInfo!
+}
+
 type SubSection {
   id: ID!
   title: String!
@@ -1119,7 +1163,7 @@ type TermsOfService {
 }
 
 extend type Query {
-  news: [News!]! @authenticated
+  news(page: Page): NewsPage! @authenticated
   termsAndConditions: TermsOfService! @authenticated
 }
 `, BuiltIn: false},
@@ -1442,6 +1486,21 @@ func (ec *executionContext) field_Query_isUserAssociatedWithConference_args(ctx 
 		}
 	}
 	args["conferenceId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_news_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *models.Page
+	if tmp, ok := rawArgs["page"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("page"))
+		arg0, err = ec.unmarshalOPage2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐPage(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["page"] = arg0
 	return args, nil
 }
 
@@ -3763,6 +3822,162 @@ func (ec *executionContext) fieldContext_News_date(ctx context.Context, field gr
 	return fc, nil
 }
 
+func (ec *executionContext) _NewsMeta_page(ctx context.Context, field graphql.CollectedField, obj *models.NewsMeta) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewsMeta_page(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Page, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewsMeta_page(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewsMeta",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "totalItems":
+				return ec.fieldContext_PageInfo_totalItems(ctx, field)
+			case "totalPages":
+				return ec.fieldContext_PageInfo_totalPages(ctx, field)
+			case "number":
+				return ec.fieldContext_PageInfo_number(ctx, field)
+			case "size":
+				return ec.fieldContext_PageInfo_size(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NewsPage_data(ctx context.Context, field graphql.CollectedField, obj *models.NewsPage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewsPage_data(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Data, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.News)
+	fc.Result = res
+	return ec.marshalNNews2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewsᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewsPage_data(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewsPage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_News_id(ctx, field)
+			case "title":
+				return ec.fieldContext_News_title(ctx, field)
+			case "content":
+				return ec.fieldContext_News_content(ctx, field)
+			case "date":
+				return ec.fieldContext_News_date(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type News", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NewsPage_meta(ctx context.Context, field graphql.CollectedField, obj *models.NewsPage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NewsPage_meta(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Meta, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.NewsMeta)
+	fc.Result = res
+	return ec.marshalNNewsMeta2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewsMeta(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NewsPage_meta(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NewsPage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "page":
+				return ec.fieldContext_NewsMeta_page(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type NewsMeta", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _OrganizerMetrics_runningConferences(ctx context.Context, field graphql.CollectedField, obj *models.OrganizerMetrics) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_OrganizerMetrics_runningConferences(ctx, field)
 	if err != nil {
@@ -4368,7 +4583,7 @@ func (ec *executionContext) _Query_news(ctx context.Context, field graphql.Colle
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().News(rctx)
+			return ec.resolvers.Query().News(rctx, fc.Args["page"].(*models.Page))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.Authenticated == nil {
@@ -4384,10 +4599,10 @@ func (ec *executionContext) _Query_news(ctx context.Context, field graphql.Colle
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.([]*models.News); ok {
+		if data, ok := tmp.(*models.NewsPage); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be []*github.com/maciejas22/conference-manager/api/internal/models.News`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.NewsPage`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4399,9 +4614,9 @@ func (ec *executionContext) _Query_news(ctx context.Context, field graphql.Colle
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*models.News)
+	res := resTmp.(*models.NewsPage)
 	fc.Result = res
-	return ec.marshalNNews2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewsᚄ(ctx, field.Selections, res)
+	return ec.marshalNNewsPage2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewsPage(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_news(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -4412,17 +4627,24 @@ func (ec *executionContext) fieldContext_Query_news(ctx context.Context, field g
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_News_id(ctx, field)
-			case "title":
-				return ec.fieldContext_News_title(ctx, field)
-			case "content":
-				return ec.fieldContext_News_content(ctx, field)
-			case "date":
-				return ec.fieldContext_News_date(ctx, field)
+			case "data":
+				return ec.fieldContext_NewsPage_data(ctx, field)
+			case "meta":
+				return ec.fieldContext_NewsPage_meta(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type News", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type NewsPage", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_news_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -8788,6 +9010,89 @@ func (ec *executionContext) _News(ctx context.Context, sel ast.SelectionSet, obj
 	return out
 }
 
+var newsMetaImplementors = []string{"NewsMeta"}
+
+func (ec *executionContext) _NewsMeta(ctx context.Context, sel ast.SelectionSet, obj *models.NewsMeta) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, newsMetaImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("NewsMeta")
+		case "page":
+			out.Values[i] = ec._NewsMeta_page(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var newsPageImplementors = []string{"NewsPage"}
+
+func (ec *executionContext) _NewsPage(ctx context.Context, sel ast.SelectionSet, obj *models.NewsPage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, newsPageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("NewsPage")
+		case "data":
+			out.Values[i] = ec._NewsPage_data(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "meta":
+			out.Values[i] = ec._NewsPage_meta(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var organizerMetricsImplementors = []string{"OrganizerMetrics"}
 
 func (ec *executionContext) _OrganizerMetrics(ctx context.Context, sel ast.SelectionSet, obj *models.OrganizerMetrics) graphql.Marshaler {
@@ -10148,6 +10453,30 @@ func (ec *executionContext) marshalNNews2ᚖgithubᚗcomᚋmaciejas22ᚋconferen
 		return graphql.Null
 	}
 	return ec._News(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNNewsMeta2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewsMeta(ctx context.Context, sel ast.SelectionSet, v *models.NewsMeta) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._NewsMeta(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNNewsPage2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewsPage(ctx context.Context, sel ast.SelectionSet, v models.NewsPage) graphql.Marshaler {
+	return ec._NewsPage(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNNewsPage2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐNewsPage(ctx context.Context, sel ast.SelectionSet, v *models.NewsPage) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._NewsPage(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNOrder2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐOrder(ctx context.Context, v interface{}) (models.Order, error) {

@@ -140,6 +140,15 @@ type News struct {
 	Date    time.Time `json:"date"`
 }
 
+type NewsMeta struct {
+	Page *PageInfo `json:"page"`
+}
+
+type NewsPage struct {
+	Data []*News   `json:"data"`
+	Meta *NewsMeta `json:"meta"`
+}
+
 type OrganizerMetrics struct {
 	RunningConferences        int                     `json:"runningConferences"`
 	ParticipantsCount         int                     `json:"participantsCount"`
