@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"errors"
-	"log"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -30,7 +29,6 @@ func GetSession(tx *sqlx.Tx, sessionId string) (*Session, error) {
 
 	err := tx.Get(&session, query, sessionId)
 	if err != nil {
-		log.Println(err)
 		return nil, errors.New("could not get session")
 	}
 	return &session, nil

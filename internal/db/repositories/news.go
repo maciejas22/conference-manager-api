@@ -1,8 +1,6 @@
 package repositories
 
 import (
-	"log"
-
 	"github.com/jmoiron/sqlx"
 	filters "github.com/maciejas22/conference-manager/api/internal/db/repositories/shared"
 )
@@ -23,7 +21,6 @@ func GetNews(tx *sqlx.Tx, page filters.Page) ([]News, filters.PaginationMeta, er
 	var news []News
 
 	offset := (page.PageNumber - 1) * page.PageSize
-	log.Println("offset", offset)
 
 	var totalItems int
 	countQuery := "SELECT COUNT(*) FROM " + (new(News)).TableName()

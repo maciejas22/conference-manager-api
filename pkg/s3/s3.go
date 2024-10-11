@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -80,7 +79,6 @@ func (client *S3Client) DeleteFile(ctx context.Context, bucket string, key strin
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
-	log.Printf("After delete object")
 
 	if err != nil {
 		client.logger.Error("error deleting file from s3 bucket", "error", err)
