@@ -3,7 +3,6 @@ package files
 import (
 	"context"
 	"io"
-	"log"
 	"strconv"
 
 	"github.com/maciejas22/conference-manager/api/internal/config"
@@ -42,6 +41,5 @@ func UploadConferenceFile(ctx context.Context, s3 *s3.S3Client, conferenceId int
 }
 
 func DeleteConferenceFile(ctx context.Context, s3 *s3.S3Client, fileKey string) error {
-	log.Printf("Deleting file with key: %s", fileKey)
 	return s3.DeleteFile(ctx, config.AppConfig.AWSBucketsConferenceFiles, fileKey)
 }

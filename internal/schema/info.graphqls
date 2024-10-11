@@ -5,6 +5,15 @@ type News {
   date: Time!
 }
 
+type NewsPage {
+  data: [News!]!
+  meta: NewsMeta!
+}
+
+type NewsMeta {
+  page: PageInfo!
+}
+
 type SubSection {
   id: ID!
   title: String!
@@ -27,6 +36,6 @@ type TermsOfService {
 }
 
 extend type Query {
-  news: [News!]! @authenticated
+  news(page: Page): NewsPage! @authenticated
   termsAndConditions: TermsOfService! @authenticated
 }

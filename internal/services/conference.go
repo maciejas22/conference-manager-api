@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"encoding/base64"
-	"log"
 	"strings"
 	"time"
 
@@ -131,7 +130,6 @@ func ModifyConference(ctx context.Context, dbClient *db.DB, s3 *s3.S3Client, inp
 				if err != nil {
 					return err
 				}
-				log.Printf("Deleted file with key: %s", f.DeleteFile.Key)
 			} else if f.UploadFile != nil {
 				fileParts := strings.Split(f.UploadFile.Base64Content, ",")
 				if len(fileParts) > 1 {

@@ -59,7 +59,7 @@ func GetAllConferences(tx *sqlx.Tx, userId int, p filters.Page, s *filters.Sort,
 	queryArgs := []interface{}{}
 
 	if f != nil && f.Title != nil {
-		whereClause += fmt.Sprintf(" AND title LIKE $%d", len(queryArgs)+1)
+		whereClause += fmt.Sprintf(" AND title ILIKE $%d", len(queryArgs)+1)
 		queryArgs = append(queryArgs, "%"+*f.Title+"%")
 	}
 

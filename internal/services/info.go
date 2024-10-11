@@ -7,14 +7,29 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/maciejas22/conference-manager/api/internal/db"
 	"github.com/maciejas22/conference-manager/api/internal/db/repositories"
+	filters "github.com/maciejas22/conference-manager/api/internal/db/repositories/shared"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 )
 
-func GetNews(ctx context.Context, dbClient *db.DB) ([]*models.News, error) {
+func GetNews(ctx context.Context, dbClient *db.DB, p *models.Page) ([]*models.News, *models.NewsMeta, error) {
 	var news []repositories.News
+	var meta filters.PaginationMeta
+	var page filters.Page
+	if p == nil {
+		page = filters.Page{
+			PageNumber: 1,
+			PageSize:   10,
+		}
+	} else {
+		page = filters.Page{
+			PageNumber: p.Number,
+			PageSize:   p.Size,
+		}
+	}
+
 	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
 		var err error
-		news, err = repositories.GetAllNews(tx)
+		news, meta, err = repositories.GetNews(tx, page)
 		if err != nil {
 			return err
 		}
@@ -22,14 +37,14 @@ func GetNews(ctx context.Context, dbClient *db.DB) ([]*models.News, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var result []*models.News
 	for _, n := range news {
 		parsedDate, err := time.Parse(time.RFC3339, n.CreatedAt)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		result = append(result,
@@ -41,7 +56,14 @@ func GetNews(ctx context.Context, dbClient *db.DB) ([]*models.News, error) {
 			})
 	}
 
-	return result, nil
+	return result, &models.NewsMeta{
+		Page: &models.PageInfo{
+			TotalItems: meta.TotalItems,
+			TotalPages: meta.TotalPages,
+			Number:     meta.PageNumber,
+			Size:       meta.PageSize,
+		},
+	}, nil
 }
 
 func GetTermsAndConditions(ctx context.Context, dbClient *db.DB) (*models.TermsOfService, error) {
@@ -55,6 +77,9 @@ func GetTermsAndConditions(ctx context.Context, dbClient *db.DB) (*models.TermsO
 
 		return nil
 	})
+	if err != nil {
+		return &models.TermsOfService{}, err
+	}
 
 	updatedAt, err := time.Parse(time.RFC3339, termsOfService.UpdatedAt)
 	if err != nil {

@@ -12,8 +12,16 @@ import (
 	"github.com/maciejas22/conference-manager/api/internal/services"
 )
 
-func (r *queryResolver) News(ctx context.Context) ([]*models.News, error) {
-	return services.GetNews(ctx, r.dbClient)
+func (r *queryResolver) News(ctx context.Context, page *models.Page) (*models.NewsPage, error) {
+	news, meta, err := services.GetNews(ctx, r.dbClient, page)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.NewsPage{
+		Data: news,
+		Meta: meta,
+	}, nil
 }
 
 func (r *queryResolver) TermsAndConditions(ctx context.Context) (*models.TermsOfService, error) {
