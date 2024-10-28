@@ -16,6 +16,16 @@ type OrganizerMetrics {
   newParticipantsTrend: [NewParticipantsTrend!]!
 }
 
+type Ticket {
+  id: String!
+  conference: Conference!
+}
+
+type TicketsPage {
+  data: [Ticket!]!
+  meta: PageInfo!
+}
+
 type User {
   id: ID!
   name: String
@@ -24,6 +34,13 @@ type User {
   email: String!
   role: Role!
   metrics: OrganizerMetrics @hasRole(role: Organizer)
+  tickets(page: Page!): TicketsPage! @hasRole(role: Participant)
+  stripeAccountDetails: StripeAccountDetails @hasRole(role: Organizer)
+}
+
+type StripeAccountDetails {
+  id: String!
+  isVerified: Boolean!
 }
 
 extend type Query {
@@ -52,7 +69,10 @@ input UpdateUserInput {
 extend type Mutation {
   updateSession: String! @authenticated
   loginUser(loginUserInput: LoginUserInput!): String!
-  registerUser(registerUserInput: RegisterUserInput!): String!
+  registerUser(registerUserInput: RegisterUserInput!): ID!
+  stripeOnboard(returnUrl: String!, refreshUrl: String!): String!
+    @hasRole(role: Organizer)
+  logout: Boolean! @authenticated
   updateUser(updateUserInput: UpdateUserInput!): ID! @authenticated
   editPassword(password: String!): Boolean @authenticated
 }

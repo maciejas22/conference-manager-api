@@ -6,14 +6,15 @@ package resolvers
 
 import (
 	"context"
+	"time"
 
-	"github.com/maciejas22/conference-manager/api/internal/graph"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 	"github.com/maciejas22/conference-manager/api/internal/services"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
-func (r *queryResolver) News(ctx context.Context, page *models.Page) (*models.NewsPage, error) {
-	news, meta, err := services.GetNews(ctx, r.dbClient, page)
+func (r *queryResolver) News(ctx context.Context, page models.Page) (*models.NewsPage, error) {
+	news, meta, err := services.GetNews(ctx, r.dbClient, &page)
 	if err != nil {
 		return nil, err
 	}
@@ -25,20 +26,40 @@ func (r *queryResolver) News(ctx context.Context, page *models.Page) (*models.Ne
 }
 
 func (r *queryResolver) TermsAndConditions(ctx context.Context) (*models.TermsOfService, error) {
-	return services.GetTermsAndConditions(ctx, r.dbClient)
+	tos, err := services.GetTermsAndConditions(ctx, r.dbClient)
+	if err != nil {
+		return nil, gqlerror.Errorf("Error getting terms of service")
+	}
+
+	updatedAt, _ := time.Parse(time.RFC3339, tos.UpdatedAt)
+	newSections := make([]*models.Section, len(tos.Sections))
+	for i, originalSection := range tos.Sections {
+		newSubsections := make([]*models.SubSection, len(originalSection.Subsections))
+		for j, originalSubsection := range originalSection.Subsections {
+			content := ""
+			if originalSubsection.Content != nil {
+				content = *originalSubsection.Content
+			}
+			newSubsections[j] = &models.SubSection{
+				ID:      originalSubsection.Id,
+				Title:   originalSubsection.Title,
+				Content: content,
+			}
+		}
+
+		newSections[i] = &models.Section{
+			ID:          originalSection.Id,
+			Title:       &originalSection.Title,
+			Content:     originalSection.Content,
+			Subsections: newSubsections,
+		}
+	}
+
+	return &models.TermsOfService{
+		ID:              tos.Id,
+		UpdatedAt:       updatedAt,
+		Introduction:    tos.Introduction,
+		Acknowledgement: tos.Acknowledgement,
+		Sections:        newSections,
+	}, nil
 }
-
-func (r *sectionResolver) Subsections(ctx context.Context, obj *models.Section) ([]*models.SubSection, error) {
-	return services.GetToSSubsections(ctx, r.dbClient, obj.ID)
-}
-
-func (r *termsOfServiceResolver) Sections(ctx context.Context, obj *models.TermsOfService) ([]*models.Section, error) {
-	return services.GetToSSections(ctx, r.dbClient, obj.ID)
-}
-
-func (r *Resolver) Section() graph.SectionResolver { return &sectionResolver{r} }
-
-func (r *Resolver) TermsOfService() graph.TermsOfServiceResolver { return &termsOfServiceResolver{r} }
-
-type sectionResolver struct{ *Resolver }
-type termsOfServiceResolver struct{ *Resolver }

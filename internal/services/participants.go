@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/maciejas22/conference-manager/api/internal/db"
 	"github.com/maciejas22/conference-manager/api/internal/db/repositories"
+	filters "github.com/maciejas22/conference-manager/api/internal/db/repositories/shared"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
@@ -33,30 +35,6 @@ func AddUserToConference(ctx context.Context, dbClient *db.DB, userId int, confe
 	var cId int
 	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
 		var err error
-
-		participantsCount, err := repositories.GetConferenceParticipantsCount(tx, conferenceID)
-		if err != nil {
-			return err
-		}
-		conference, err := repositories.GetConference(tx, conferenceID)
-		if err != nil {
-			return err
-		}
-
-		if conference.ParticipantsLimit != nil && participantsCount >= *conference.ParticipantsLimit {
-			return gqlerror.Errorf("Conference is full")
-		}
-
-		if conference.RegistrationDeadline != nil {
-			registrationDeadline, err := time.Parse(time.RFC3339, *conference.RegistrationDeadline)
-			if err != nil {
-				return err
-			}
-
-			if time.Now().After(registrationDeadline) {
-				return gqlerror.Errorf("Registration deadline has passed")
-			}
-		}
 
 		cId, err = repositories.AddConferenceParticipant(tx, conferenceID, userId)
 		if err != nil {
@@ -181,4 +159,86 @@ func GetParticipantsJoiningTrend(ctx context.Context, dbClient *db.DB, organizer
 	}
 
 	return trendEntries, nil
+}
+
+func GetParticipantsTickets(ctx context.Context, dbClient *db.DB, participantId int, page filters.Page) ([]*models.Ticket, *models.PageInfo, error) {
+	var ticketData []*models.Ticket
+	var ticketsMeta *models.PageInfo
+	err := db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
+		participantTickets, participantsmeta, err := repositories.GetParticipantTickets(tx, participantId, page)
+		if err != nil {
+			return err
+		}
+
+		ticketsMeta = &models.PageInfo{
+			TotalItems: participantsmeta.TotalItems,
+			TotalPages: participantsmeta.TotalPages,
+			Size:       participantsmeta.PageSize,
+			Number:     participantsmeta.PageNumber,
+		}
+
+		conferenceIds := make([]int, len(participantTickets))
+		for i, ticket := range participantTickets {
+			conferenceIds[i] = ticket.ConferenceId
+		}
+
+		conferences, err := repositories.GetConferencesByIds(tx, conferenceIds)
+		if err != nil {
+			return err
+		}
+
+		conferenceMap := make(map[int]*models.Conference)
+		for _, conference := range conferences {
+			startDate, err := time.Parse(time.RFC3339, conference.StartDate)
+			if err != nil {
+				return err
+			}
+
+			endDate, err := time.Parse(time.RFC3339, conference.EndDate)
+			if err != nil {
+				return err
+			}
+
+			var registrationDeadline *time.Time
+			if conference.RegistrationDeadline != nil {
+				parsedDeadline, err := time.Parse(time.RFC3339, *conference.RegistrationDeadline)
+				if err != nil {
+					return err
+				}
+				registrationDeadline = &parsedDeadline
+			}
+
+			conferenceMap[conference.Id] = &models.Conference{
+				ID:                   conference.Id,
+				Title:                conference.Title,
+				StartDate:            startDate,
+				EndDate:              endDate,
+				Location:             conference.Location,
+				Website:              conference.Website,
+				Acronym:              conference.Acronym,
+				AdditionalInfo:       conference.AdditionalInfo,
+				ParticipantsLimit:    conference.ParticipantsLimit,
+				RegistrationDeadline: registrationDeadline,
+				TicketPrice:          conference.TicketPrice,
+			}
+		}
+
+		for _, ticket := range participantTickets {
+			conference := conferenceMap[ticket.ConferenceId]
+			if conference == nil {
+				return fmt.Errorf("Conference with ID %d not found", ticket.ConferenceId)
+			}
+			ticketData = append(ticketData, &models.Ticket{
+				ID:         ticket.TicketId,
+				Conference: conference,
+			})
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return ticketData, ticketsMeta, nil
 }

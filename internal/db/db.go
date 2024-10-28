@@ -64,14 +64,12 @@ func (db *DB) Close() (err error) {
 func Transaction(ctx context.Context, db *sqlx.DB, fn func(*sqlx.Tx) error) error {
 	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
-		log.Println("Error in transaction ", err)
 		return err
 	}
 
 	err = fn(tx)
 
 	if err != nil {
-		log.Println("Error in transaction2 ", err)
 		if rbErr := tx.Rollback(); rbErr != nil {
 			log.Println("Error in transaction rollback ", rbErr)
 			return rbErr

@@ -39,6 +39,7 @@ type Conference struct {
 	RegistrationDeadline *time.Time    `json:"registrationDeadline,omitempty"`
 	Files                []*File       `json:"files"`
 	EventsCount          int           `json:"eventsCount"`
+	TicketPrice          *int          `json:"ticketPrice,omitempty"`
 }
 
 type ConferenceMeta struct {
@@ -47,6 +48,7 @@ type ConferenceMeta struct {
 
 type ConferencesFilters struct {
 	AssociatedOnly *bool   `json:"associatedOnly,omitempty"`
+	RunningOnly    *bool   `json:"runningOnly,omitempty"`
 	Title          *string `json:"title,omitempty"`
 }
 
@@ -79,6 +81,7 @@ type CreateConferenceInput struct {
 	RegistrationDeadline *time.Time                   `json:"registrationDeadline,omitempty"`
 	Agenda               []*CreateAgendaItemInput     `json:"agenda,omitempty"`
 	Files                []*CreateConferenceInputFile `json:"files,omitempty"`
+	TicketPrice          *int                         `json:"ticketPrice,omitempty"`
 }
 
 type CreateConferenceInputFile struct {
@@ -118,6 +121,7 @@ type ModifyConferenceInput struct {
 	RegistrationDeadline *time.Time                   `json:"registrationDeadline,omitempty"`
 	Agenda               []*ModifyAgendaItemInput     `json:"agenda,omitempty"`
 	Files                []*ModifyConferenceInputFile `json:"files,omitempty"`
+	TicketPrice          *int                         `json:"ticketPrice,omitempty"`
 }
 
 type ModifyConferenceInputFile struct {
@@ -190,6 +194,11 @@ type Sort struct {
 	Order  Order  `json:"order"`
 }
 
+type StripeAccountDetails struct {
+	ID         string `json:"id"`
+	IsVerified bool   `json:"isVerified"`
+}
+
 type SubSection struct {
 	ID      int    `json:"id"`
 	Title   string `json:"title"`
@@ -202,6 +211,16 @@ type TermsOfService struct {
 	Introduction    string     `json:"introduction"`
 	Acknowledgement string     `json:"acknowledgement"`
 	Sections        []*Section `json:"sections"`
+}
+
+type Ticket struct {
+	ID         string      `json:"id"`
+	Conference *Conference `json:"conference"`
+}
+
+type TicketsPage struct {
+	Data []*Ticket `json:"data"`
+	Meta *PageInfo `json:"meta"`
 }
 
 type UpdateUserInput struct {
@@ -217,13 +236,15 @@ type UploadFile struct {
 }
 
 type User struct {
-	ID       int               `json:"id"`
-	Name     *string           `json:"name,omitempty"`
-	Surname  *string           `json:"surname,omitempty"`
-	Username *string           `json:"username,omitempty"`
-	Email    string            `json:"email"`
-	Role     Role              `json:"role"`
-	Metrics  *OrganizerMetrics `json:"metrics,omitempty"`
+	ID                   int                   `json:"id"`
+	Name                 *string               `json:"name,omitempty"`
+	Surname              *string               `json:"surname,omitempty"`
+	Username             *string               `json:"username,omitempty"`
+	Email                string                `json:"email"`
+	Role                 Role                  `json:"role"`
+	Metrics              *OrganizerMetrics     `json:"metrics,omitempty"`
+	Tickets              *TicketsPage          `json:"tickets"`
+	StripeAccountDetails *StripeAccountDetails `json:"stripeAccountDetails,omitempty"`
 }
 
 type Order string

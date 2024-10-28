@@ -13,6 +13,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/mattn/go-sqlite3 v1.14.23
 	github.com/spf13/viper v1.19.0
+	github.com/stripe/stripe-go/v80 v80.2.0-beta.2
 	github.com/vektah/gqlparser/v2 v2.5.11
 	golang.org/x/crypto v0.27.0
 	golang.org/x/net v0.25.0

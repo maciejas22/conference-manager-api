@@ -138,3 +138,18 @@ func GetParticipantsTrend(tx *sqlx.Tx, organizerId int) ([]TrendEntry, error) {
 
 	return counts, nil
 }
+
+func GetConferenceOrganizerId(tx *sqlx.Tx, conferenceId int) (int, error) {
+	var organizerId int
+	o := &ConferenceOrganizer{}
+	query := "SELECT user_id FROM " + o.TableName() + " WHERE conference_id = $1"
+	err := tx.Get(
+		&organizerId,
+		query,
+		conferenceId,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return organizerId, nil
+}

@@ -16,15 +16,16 @@ const (
 )
 
 type User struct {
-	Id        int     `json:"id" db:"id"`
-	Name      *string `json:"name" db:"name"`
-	Surname   *string `json:"surname" db:"surname"`
-	Username  *string `json:"username" db:"username"`
-	Email     *string `json:"email" db:"email"`
-	Role      Role    `json:"role" db:"role"`
-	Password  string  `json:"password" db:"password"`
-	CreatedAt string  `json:"created_at" db:"created_at"`
-	UpdatedAt string  `json:"updated_at" db:"updated_at"`
+	Id              int     `json:"id" db:"id"`
+	Name            *string `json:"name" db:"name"`
+	Surname         *string `json:"surname" db:"surname"`
+	Username        *string `json:"username" db:"username"`
+	Email           *string `json:"email" db:"email"`
+	Role            Role    `json:"role" db:"role"`
+	Password        string  `json:"password" db:"password"`
+	CreatedAt       string  `json:"created_at" db:"created_at"`
+	UpdatedAt       string  `json:"updated_at" db:"updated_at"`
+	StripeAccountId *string `json:"stripe_account_id" db:"stripe_account_id"`
 }
 
 func (u *User) TableName() string {
@@ -35,7 +36,7 @@ func GetUserByID(tx *sqlx.Tx, id int) (User, error) {
 	var user User
 
 	query := `
-    SELECT id, name, surname, username, role, email, created_at, updated_at, password 
+    SELECT id, name, surname, username, role, email, created_at, updated_at, password, stripe_account_id
     FROM ` + user.TableName() + ` 
     WHERE id = $1 
   `
@@ -113,10 +114,10 @@ func UpdateUser(
 	return user, nil
 }
 
-func CreateUser(tx *sqlx.Tx, email string, passwordHash string, role string) (int, error) {
-	query := "INSERT INTO users (email, password, role) VALUES ($1, $2, $3) RETURNING id"
+func CreateUser(tx *sqlx.Tx, email string, passwordHash string, role string, stripeAccountId *string) (int, error) {
+	query := "INSERT INTO users (email, password, role, stripe_account_id) VALUES ($1, $2, $3, $4) RETURNING id"
 	var userId int
-	err := tx.QueryRow(query, email, passwordHash, role).Scan(&userId)
+	err := tx.QueryRow(query, email, passwordHash, role, stripeAccountId).Scan(&userId)
 	if err != nil {
 		return 0, errors.New("could not create user")
 	}
@@ -128,7 +129,7 @@ func GetUserBySessionId(tx *sqlx.Tx, sessionId string) (User, error) {
 	var user User
 
 	query := `
-    SELECT u.id, u.name, u.surname, u.username, u.role, u.email, u.created_at, u.updated_at, u.password
+    SELECT u.id, u.name, u.surname, u.username, u.role, u.email, u.created_at, u.updated_at, u.password, u.stripe_account_id
     FROM ` + user.TableName() + ` u 
     JOIN sessions s ON u.id = s.user_id 
     WHERE s.session_id = $1
@@ -149,7 +150,7 @@ func GetUserByEmail(tx *sqlx.Tx, email string) (User, error) {
 	var user User
 
 	query := `
-    SELECT u.id, u.name, u.surname, u.username, u.role, u.email, u.role, u.created_at, u.updated_at, u.password
+    SELECT u.id, u.name, u.surname, u.username, u.role, u.email, u.role, u.created_at, u.updated_at, u.password, u.stripe_account_id
     FROM ` + user.TableName() + ` u 
     WHERE u.email = $1
   `

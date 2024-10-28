@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -19,6 +20,8 @@ import (
 	"github.com/maciejas22/conference-manager/api/internal/graph"
 	"github.com/maciejas22/conference-manager/api/internal/middlewares"
 	"github.com/maciejas22/conference-manager/api/internal/resolvers"
+	"github.com/maciejas22/conference-manager/api/internal/services"
+	"github.com/maciejas22/conference-manager/api/internal/stripe"
 	"github.com/maciejas22/conference-manager/api/pkg/s3"
 )
 
@@ -64,6 +67,8 @@ func main() {
 		logger.Error("failed to connect to s3", "error", err)
 	}
 
+	stripe.SetupStripe(logger)
+
 	resolver := resolvers.NewResolver(ctx, db, s3)
 	c := graph.Config{Resolvers: resolver}
 	c.Directives.Authenticated = directives.Authenticated
@@ -74,10 +79,14 @@ func main() {
 
 	port := config.AppConfig.Port
 	r.Handle("/graphql", srv)
+	logger.Info("Connet to GraphQL", "url", fmt.Sprintf("http://localhost:%d/graphql", port))
 	if config.AppConfig.GoEnv == "dev" {
 		r.Handle("/playground", playground.Handler("GraphQL playground", "/graphql"))
-		log.Printf("connect to http://localhost:%d/playground for GraphQL playground", port)
+		logger.Info("Connet to GraphQL playground", "url", fmt.Sprintf("http://localhost:%d/playground", port))
 	}
+
+	r.Post("/v1/webhooks/stripe", services.HandlePaymentIntentConfirmation(ctx, db, logger))
+	logger.Info("Connet to Stripe webhook", "url", fmt.Sprintf("http://localhost:%d/v1/webhooks/stripe", port))
 
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(port), r))
 }

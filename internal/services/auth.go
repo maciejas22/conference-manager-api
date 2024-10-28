@@ -8,11 +8,12 @@ import (
 	"github.com/maciejas22/conference-manager/api/internal/db"
 	"github.com/maciejas22/conference-manager/api/internal/db/repositories"
 	"github.com/maciejas22/conference-manager/api/internal/models"
+	"github.com/maciejas22/conference-manager/api/internal/stripe"
 	"golang.org/x/net/context"
 )
 
-func RegisterUser(ctx context.Context, dbClient *db.DB, userData models.RegisterUserInput) (*string, error) {
-	var userSession *string
+func RegisterUser(ctx context.Context, dbClient *db.DB, userData models.RegisterUserInput) (*int, error) {
+	var userId int
 	hashedPassword, err := auth.HashPassword(userData.Password)
 	if err != nil {
 		return nil, err
@@ -20,17 +21,16 @@ func RegisterUser(ctx context.Context, dbClient *db.DB, userData models.Register
 
 	err = db.Transaction(ctx, dbClient.Conn, func(tx *sqlx.Tx) error {
 		var err error
-		userId, err := repositories.CreateUser(tx, userData.Email, hashedPassword, userData.Role.String())
-		if err != nil {
-			return err
+		var stripeAccountId *string
+
+		if userData.Role == models.RoleOrganizer {
+			stripeAccountId, err = stripe.CreateStripeAccount(userData.Email)
+			if err != nil {
+				return err
+			}
 		}
 
-		sessionId, err := auth.GenerateSessionId()
-		if err != nil {
-			return err
-		}
-
-		userSession, err = repositories.CreateSession(tx, sessionId, userId)
+		userId, err = repositories.CreateUser(tx, userData.Email, hashedPassword, userData.Role.String(), stripeAccountId)
 		if err != nil {
 			return err
 		}
@@ -41,7 +41,7 @@ func RegisterUser(ctx context.Context, dbClient *db.DB, userData models.Register
 		return nil, err
 	}
 
-	return userSession, err
+	return &userId, nil
 }
 
 func LoginUser(ctx context.Context, dbClient *db.DB, userData models.LoginUserInput) (*string, error) {

@@ -25,7 +25,7 @@ func LoggingMiddleware(l *slog.Logger) func(http.Handler) http.Handler {
 func GraphqlLogginMiddleware(srv *handler.Server, logger *slog.Logger) {
 	srv.AroundResponses(func(ctx context.Context, next graphql.ResponseHandler) *graphql.Response {
 		req := graphql.GetOperationContext(ctx)
-		logger.Debug("graphql request", "operation", req.Operation.Operation, req.Operation.Name)
+		logger.Debug("gql", "operation", req.Operation.Operation, "name", req.Operation.Name)
 		return next(ctx)
 	})
 }

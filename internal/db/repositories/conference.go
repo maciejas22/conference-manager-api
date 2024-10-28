@@ -22,6 +22,7 @@ type Conference struct {
 	RegistrationDeadline *string `json:"registration_deadline,omitempty" db:"registration_deadline"`
 	CreatedAt            string  `json:"created_at" db:"created_at"`
 	UpdatedAt            string  `json:"updated_at" db:"updated_at"`
+	TicketPrice          *int    `json:"ticket_price,omitempty" db:"ticket_price"`
 }
 
 func (c *Conference) TableName() string {
@@ -29,13 +30,14 @@ func (c *Conference) TableName() string {
 }
 
 type ConferenceFilter struct {
-	Title          *string `json:"title"`
-	AssociatedOnly *bool   `json:"associatedOnly,omitempty"`
+	Title          *string
+	AssociatedOnly *bool
+	RunningOnly    *bool
 }
 
 func GetConference(tx *sqlx.Tx, conferenceId int) (Conference, error) {
 	var conference Conference
-	query := "SELECT id, title, start_date, end_date, location, additional_info, acronym, website, participants_limit, registration_deadline FROM " + conference.TableName() + " WHERE id = $1"
+	query := "SELECT id, title, start_date, end_date, location, additional_info, acronym, website, participants_limit, registration_deadline, ticket_price FROM " + conference.TableName() + " WHERE id = $1"
 	err := tx.Get(
 		&conference,
 		query,
@@ -47,12 +49,22 @@ func GetConference(tx *sqlx.Tx, conferenceId int) (Conference, error) {
 	return conference, nil
 }
 
+func GetConferencesByIds(tx *sqlx.Tx, conferenceIds []int) ([]Conference, error) {
+	var conferences []Conference
+	query := "SELECT id, title, start_date, end_date, location, additional_info, acronym, website, participants_limit, registration_deadline, ticket_price FROM " + (new(Conference)).TableName() + " WHERE id = ANY($1)"
+	err := tx.Select(&conferences, query, conferenceIds)
+	if err != nil {
+		return nil, err
+	}
+	return conferences, nil
+}
+
 func GetAllConferences(tx *sqlx.Tx, userId int, p filters.Page, s *filters.Sort, f *ConferenceFilter) ([]Conference, filters.PaginationMeta, error) {
 	var conferences []Conference
 	var totalItems int
 	c := &Conference{}
 
-	query := "SELECT id, title, start_date, end_date, location, website, acronym, additional_info, participants_limit, registration_deadline FROM " + c.TableName()
+	query := "SELECT id, title, start_date, end_date, location, website, acronym, additional_info, participants_limit, registration_deadline, ticket_price FROM " + c.TableName()
 	countQuery := "SELECT COUNT(*) FROM " + c.TableName()
 
 	whereClause := " WHERE 1=1"
@@ -67,6 +79,12 @@ func GetAllConferences(tx *sqlx.Tx, userId int, p filters.Page, s *filters.Sort,
 		whereClause += fmt.Sprintf(" AND id IN (SELECT conference_id FROM %s WHERE user_id = $%d UNION SELECT conference_id FROM %s WHERE user_id = $%d)",
 			(new(ConferenceParticipant)).TableName(), len(queryArgs)+1, (new(ConferenceOrganizer)).TableName(), len(queryArgs)+2)
 		queryArgs = append(queryArgs, userId, userId)
+	}
+
+	if f != nil && f.RunningOnly != nil && *f.RunningOnly {
+		now := time.Now()
+		whereClause += fmt.Sprintf(" AND start_date <= $%d AND end_date >= $%d", len(queryArgs)+1, len(queryArgs)+2)
+		queryArgs = append(queryArgs, now, now)
 	}
 
 	query += whereClause
@@ -102,7 +120,7 @@ func GetAllConferences(tx *sqlx.Tx, userId int, p filters.Page, s *filters.Sort,
 }
 
 func CreateConference(tx *sqlx.Tx, conference Conference, organizerId int) (int, error) {
-	query := "INSERT INTO " + conference.TableName() + " (title, start_date, end_date, location, website, acronym, additional_info, participants_limit, registration_deadline) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id"
+	query := "INSERT INTO " + conference.TableName() + " (title, start_date, end_date, location, website, acronym, additional_info, participants_limit, registration_deadline, ticket_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id"
 	var conferenceId int
 	err := tx.QueryRowx(query,
 		conference.Title,
@@ -114,6 +132,7 @@ func CreateConference(tx *sqlx.Tx, conference Conference, organizerId int) (int,
 		conference.AdditionalInfo,
 		conference.ParticipantsLimit,
 		conference.RegistrationDeadline,
+		conference.TicketPrice,
 	).Scan(&conferenceId)
 	if err != nil {
 		return 0, err
@@ -128,7 +147,7 @@ func CreateConference(tx *sqlx.Tx, conference Conference, organizerId int) (int,
 }
 
 func UpdateConference(tx *sqlx.Tx, conference Conference) (int, error) {
-	query := "UPDATE " + conference.TableName() + " SET title = $1, start_date = $2, end_date = $3, location = $4, website = $5, acronym = $6, additional_info = $7, participants_limit = $8, registration_deadline = $9 WHERE id = $10"
+	query := "UPDATE " + conference.TableName() + " SET title = $1, start_date = $2, end_date = $3, location = $4, website = $5, acronym = $6, additional_info = $7, participants_limit = $8, registration_deadline = $9, ticket_price = $10 WHERE id = $11"
 	_, err := tx.Exec(
 		query,
 		conference.Title,
@@ -140,6 +159,7 @@ func UpdateConference(tx *sqlx.Tx, conference Conference) (int, error) {
 		conference.AdditionalInfo,
 		conference.ParticipantsLimit,
 		conference.RegistrationDeadline,
+		conference.TicketPrice,
 		conference.Id,
 	)
 	if err != nil {

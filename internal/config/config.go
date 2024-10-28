@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/viper"
+	"github.com/stripe/stripe-go/v80"
 )
 
 type Config struct {
@@ -13,6 +14,8 @@ type Config struct {
 	ServerPort                string   `mapstructure:"SERVER_PORT"`
 	CorsAllowedOrigins        []string `mapstructure:"CORS_ALLOWED_ORIGINS"`
 	DatabaseURL               string   `mapstructure:"DATABASE_URL"`
+	StripeSecretKey           string   `mapstructure:"STRIPE_SECRET_KEY"`
+	StripeWebhookSecret       string   `mapstructure:"STRIPE_WEBHOOK_SECRET"`
 	AWSRegion                 string   `mapstructure:"AWS_REGION"`
 	AWSEndpoint               string   `mapstructure:"AWS_ENDPOINT_URL_S3"`
 	AWSAccessKeyId            string   `mapstructure:"AWS_ACCESS_KEY_ID"`
@@ -38,6 +41,10 @@ func setAWSConfig() {
 	os.Setenv("AWS_ENDPOINT_URL_S3", AppConfig.AWSEndpoint)
 	os.Setenv("AWS_ACCESS_KEY_ID", AppConfig.AWSAccessKeyId)
 	os.Setenv("AWS_SECRET_ACCESS_KEY", AppConfig.AWSSecretAccessKey)
+}
+
+func setStripeConfig() {
+	stripe.Key = AppConfig.StripeSecretKey
 }
 
 func LoadConfig() {
@@ -72,7 +79,9 @@ func LoadConfig() {
 		log.Fatalf("config cant be loaded: %v", err)
 	}
 
+	setStripeConfig()
+	setAWSConfig()
+
 	log.Printf("app is running in %s mode\n", env)
 	log.Printf("cors allowed origins: %v\n", AppConfig.CorsAllowedOrigins)
-	setAWSConfig()
 }

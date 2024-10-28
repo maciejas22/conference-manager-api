@@ -7,10 +7,11 @@ import (
 )
 
 type SessionInfo struct {
-	SessionId string
-	ExpiresAt string
-	UserId    int
-	Role      repositories.Role
+	SessionId       string
+	ExpiresAt       string
+	UserId          int
+	StripeAccountId *string
+	Role            repositories.Role
 }
 
 type contextKey string

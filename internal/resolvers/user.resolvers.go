@@ -12,6 +12,7 @@ import (
 	"github.com/maciejas22/conference-manager/api/internal/auth"
 	"github.com/maciejas22/conference-manager/api/internal/db"
 	"github.com/maciejas22/conference-manager/api/internal/db/repositories"
+	filters "github.com/maciejas22/conference-manager/api/internal/db/repositories/shared"
 	"github.com/maciejas22/conference-manager/api/internal/graph"
 	"github.com/maciejas22/conference-manager/api/internal/models"
 	"github.com/maciejas22/conference-manager/api/internal/services"
@@ -59,13 +60,32 @@ func (r *mutationResolver) LoginUser(ctx context.Context, loginUserInput models.
 	return *sessionId, nil
 }
 
-func (r *mutationResolver) RegisterUser(ctx context.Context, registerUserInput models.RegisterUserInput) (string, error) {
-	sessionId, err := services.RegisterUser(ctx, r.dbClient, registerUserInput)
+func (r *mutationResolver) RegisterUser(ctx context.Context, registerUserInput models.RegisterUserInput) (int, error) {
+	userId, err := services.RegisterUser(ctx, r.dbClient, registerUserInput)
 	if err != nil {
-		return "", gqlerror.Errorf("Failed to register user")
+		return -1, gqlerror.Errorf("Failed to register user")
 	}
 
-	return *sessionId, nil
+	return *userId, nil
+}
+
+func (r *mutationResolver) StripeOnboard(ctx context.Context, returnURL string, refreshURL string) (string, error) {
+	si := auth.GetSessionInfo(ctx)
+	onboardingUrl, err := services.StripeOnboard(ctx, r.dbClient, si.UserId, returnURL, refreshURL)
+	if err != nil {
+		return "", gqlerror.Errorf("Failed to create account link")
+	}
+
+	return onboardingUrl, nil
+}
+
+func (r *mutationResolver) Logout(ctx context.Context) (bool, error) {
+	si := auth.GetSessionInfo(ctx)
+	ok, err := services.DestroyUserSession(ctx, r.dbClient, si.UserId)
+	if err != nil {
+		return false, gqlerror.Errorf("Failed to logout user")
+	}
+	return ok, nil
 }
 
 func (r *mutationResolver) UpdateUser(ctx context.Context, updateUserInput models.UpdateUserInput) (int, error) {
@@ -158,6 +178,36 @@ func (r *userResolver) Metrics(ctx context.Context, obj *models.User) (*models.O
 	}
 
 	return basicMetrics, nil
+}
+
+func (r *userResolver) Tickets(ctx context.Context, obj *models.User, page models.Page) (*models.TicketsPage, error) {
+	si := auth.GetSessionInfo(ctx)
+
+	ticketsPage := filters.Page{
+		PageNumber: page.Number,
+		PageSize:   page.Size,
+	}
+
+	tickets, ticketsMeta, err := services.GetParticipantsTickets(ctx, r.dbClient, si.UserId, ticketsPage)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.TicketsPage{
+		Data: tickets,
+		Meta: ticketsMeta,
+	}, nil
+}
+
+func (r *userResolver) StripeAccountDetails(ctx context.Context, obj *models.User) (*models.StripeAccountDetails, error) {
+	si := auth.GetSessionInfo(ctx)
+
+	accountDetails, err := services.GetStripeAccount(ctx, r.dbClient, si.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	return accountDetails, nil
 }
 
 func (r *Resolver) OrganizerMetrics() graph.OrganizerMetricsResolver {

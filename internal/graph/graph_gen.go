@@ -44,8 +44,6 @@ type ResolverRoot interface {
 	Mutation() MutationResolver
 	OrganizerMetrics() OrganizerMetricsResolver
 	Query() QueryResolver
-	Section() SectionResolver
-	TermsOfService() TermsOfServiceResolver
 	User() UserResolver
 }
 
@@ -76,6 +74,7 @@ type ComplexityRoot struct {
 		ParticipantsLimit    func(childComplexity int) int
 		RegistrationDeadline func(childComplexity int) int
 		StartDate            func(childComplexity int) int
+		TicketPrice          func(childComplexity int) int
 		Title                func(childComplexity int) int
 		Website              func(childComplexity int) int
 	}
@@ -108,9 +107,11 @@ type ComplexityRoot struct {
 		CreateConference         func(childComplexity int, createConferenceInput models.CreateConferenceInput) int
 		EditPassword             func(childComplexity int, password string) int
 		LoginUser                func(childComplexity int, loginUserInput models.LoginUserInput) int
+		Logout                   func(childComplexity int) int
 		ModifyConference         func(childComplexity int, input models.ModifyConferenceInput) int
 		RegisterUser             func(childComplexity int, registerUserInput models.RegisterUserInput) int
 		RemoveUserFromConference func(childComplexity int, conferenceID int) int
+		StripeOnboard            func(childComplexity int, returnURL string, refreshURL string) int
 		UpdateSession            func(childComplexity int) int
 		UpdateUser               func(childComplexity int, updateUserInput models.UpdateUserInput) int
 	}
@@ -155,7 +156,7 @@ type ComplexityRoot struct {
 		Conference                     func(childComplexity int, id int) int
 		Conferences                    func(childComplexity int, page *models.Page, sort *models.Sort, filters *models.ConferencesFilters) int
 		IsUserAssociatedWithConference func(childComplexity int, conferenceID int) int
-		News                           func(childComplexity int, page *models.Page) int
+		News                           func(childComplexity int, page models.Page) int
 		TermsAndConditions             func(childComplexity int) int
 		User                           func(childComplexity int) int
 	}
@@ -165,6 +166,11 @@ type ComplexityRoot struct {
 		ID          func(childComplexity int) int
 		Subsections func(childComplexity int) int
 		Title       func(childComplexity int) int
+	}
+
+	StripeAccountDetails struct {
+		ID         func(childComplexity int) int
+		IsVerified func(childComplexity int) int
 	}
 
 	SubSection struct {
@@ -181,14 +187,26 @@ type ComplexityRoot struct {
 		UpdatedAt       func(childComplexity int) int
 	}
 
+	Ticket struct {
+		Conference func(childComplexity int) int
+		ID         func(childComplexity int) int
+	}
+
+	TicketsPage struct {
+		Data func(childComplexity int) int
+		Meta func(childComplexity int) int
+	}
+
 	User struct {
-		Email    func(childComplexity int) int
-		ID       func(childComplexity int) int
-		Metrics  func(childComplexity int) int
-		Name     func(childComplexity int) int
-		Role     func(childComplexity int) int
-		Surname  func(childComplexity int) int
-		Username func(childComplexity int) int
+		Email                func(childComplexity int) int
+		ID                   func(childComplexity int) int
+		Metrics              func(childComplexity int) int
+		Name                 func(childComplexity int) int
+		Role                 func(childComplexity int) int
+		StripeAccountDetails func(childComplexity int) int
+		Surname              func(childComplexity int) int
+		Tickets              func(childComplexity int, page models.Page) int
+		Username             func(childComplexity int) int
 	}
 }
 
@@ -205,11 +223,13 @@ type ConferencesPageResolver interface {
 type MutationResolver interface {
 	CreateConference(ctx context.Context, createConferenceInput models.CreateConferenceInput) (int, error)
 	ModifyConference(ctx context.Context, input models.ModifyConferenceInput) (int, error)
-	AddUserToConference(ctx context.Context, conferenceID int) (int, error)
+	AddUserToConference(ctx context.Context, conferenceID int) (*string, error)
 	RemoveUserFromConference(ctx context.Context, conferenceID int) (int, error)
 	UpdateSession(ctx context.Context) (string, error)
 	LoginUser(ctx context.Context, loginUserInput models.LoginUserInput) (string, error)
-	RegisterUser(ctx context.Context, registerUserInput models.RegisterUserInput) (string, error)
+	RegisterUser(ctx context.Context, registerUserInput models.RegisterUserInput) (int, error)
+	StripeOnboard(ctx context.Context, returnURL string, refreshURL string) (string, error)
+	Logout(ctx context.Context) (bool, error)
 	UpdateUser(ctx context.Context, updateUserInput models.UpdateUserInput) (int, error)
 	EditPassword(ctx context.Context, password string) (*bool, error)
 }
@@ -219,19 +239,15 @@ type OrganizerMetricsResolver interface {
 type QueryResolver interface {
 	Conference(ctx context.Context, id int) (*models.Conference, error)
 	Conferences(ctx context.Context, page *models.Page, sort *models.Sort, filters *models.ConferencesFilters) (*models.ConferencesPage, error)
-	News(ctx context.Context, page *models.Page) (*models.NewsPage, error)
+	News(ctx context.Context, page models.Page) (*models.NewsPage, error)
 	TermsAndConditions(ctx context.Context) (*models.TermsOfService, error)
 	User(ctx context.Context) (*models.User, error)
 	IsUserAssociatedWithConference(ctx context.Context, conferenceID int) (bool, error)
 }
-type SectionResolver interface {
-	Subsections(ctx context.Context, obj *models.Section) ([]*models.SubSection, error)
-}
-type TermsOfServiceResolver interface {
-	Sections(ctx context.Context, obj *models.TermsOfService) ([]*models.Section, error)
-}
 type UserResolver interface {
 	Metrics(ctx context.Context, obj *models.User) (*models.OrganizerMetrics, error)
+	Tickets(ctx context.Context, obj *models.User, page models.Page) (*models.TicketsPage, error)
+	StripeAccountDetails(ctx context.Context, obj *models.User) (*models.StripeAccountDetails, error)
 }
 
 type executableSchema struct {
@@ -372,6 +388,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Conference.StartDate(childComplexity), true
 
+	case "Conference.ticketPrice":
+		if e.complexity.Conference.TicketPrice == nil {
+			break
+		}
+
+		return e.complexity.Conference.TicketPrice(childComplexity), true
+
 	case "Conference.title":
 		if e.complexity.Conference.Title == nil {
 			break
@@ -511,6 +534,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.LoginUser(childComplexity, args["loginUserInput"].(models.LoginUserInput)), true
 
+	case "Mutation.logout":
+		if e.complexity.Mutation.Logout == nil {
+			break
+		}
+
+		return e.complexity.Mutation.Logout(childComplexity), true
+
 	case "Mutation.modifyConference":
 		if e.complexity.Mutation.ModifyConference == nil {
 			break
@@ -546,6 +576,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.RemoveUserFromConference(childComplexity, args["conferenceId"].(int)), true
+
+	case "Mutation.stripeOnboard":
+		if e.complexity.Mutation.StripeOnboard == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_stripeOnboard_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.StripeOnboard(childComplexity, args["returnUrl"].(string), args["refreshUrl"].(string)), true
 
 	case "Mutation.updateSession":
 		if e.complexity.Mutation.UpdateSession == nil {
@@ -738,7 +780,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.News(childComplexity, args["page"].(*models.Page)), true
+		return e.complexity.Query.News(childComplexity, args["page"].(models.Page)), true
 
 	case "Query.termsAndConditions":
 		if e.complexity.Query.TermsAndConditions == nil {
@@ -781,6 +823,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Section.Title(childComplexity), true
+
+	case "StripeAccountDetails.id":
+		if e.complexity.StripeAccountDetails.ID == nil {
+			break
+		}
+
+		return e.complexity.StripeAccountDetails.ID(childComplexity), true
+
+	case "StripeAccountDetails.isVerified":
+		if e.complexity.StripeAccountDetails.IsVerified == nil {
+			break
+		}
+
+		return e.complexity.StripeAccountDetails.IsVerified(childComplexity), true
 
 	case "SubSection.content":
 		if e.complexity.SubSection.Content == nil {
@@ -838,6 +894,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TermsOfService.UpdatedAt(childComplexity), true
 
+	case "Ticket.conference":
+		if e.complexity.Ticket.Conference == nil {
+			break
+		}
+
+		return e.complexity.Ticket.Conference(childComplexity), true
+
+	case "Ticket.id":
+		if e.complexity.Ticket.ID == nil {
+			break
+		}
+
+		return e.complexity.Ticket.ID(childComplexity), true
+
+	case "TicketsPage.data":
+		if e.complexity.TicketsPage.Data == nil {
+			break
+		}
+
+		return e.complexity.TicketsPage.Data(childComplexity), true
+
+	case "TicketsPage.meta":
+		if e.complexity.TicketsPage.Meta == nil {
+			break
+		}
+
+		return e.complexity.TicketsPage.Meta(childComplexity), true
+
 	case "User.email":
 		if e.complexity.User.Email == nil {
 			break
@@ -873,12 +957,31 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.User.Role(childComplexity), true
 
+	case "User.stripeAccountDetails":
+		if e.complexity.User.StripeAccountDetails == nil {
+			break
+		}
+
+		return e.complexity.User.StripeAccountDetails(childComplexity), true
+
 	case "User.surname":
 		if e.complexity.User.Surname == nil {
 			break
 		}
 
 		return e.complexity.User.Surname(childComplexity), true
+
+	case "User.tickets":
+		if e.complexity.User.Tickets == nil {
+			break
+		}
+
+		args, err := ec.field_User_tickets_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.User.Tickets(childComplexity, args["page"].(models.Page)), true
 
 	case "User.username":
 		if e.complexity.User.Username == nil {
@@ -1009,6 +1112,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 var sources = []*ast.Source{
 	{Name: "../schema/conference.graphqls", Input: `input ConferencesFilters {
   associatedOnly: Boolean
+  runningOnly: Boolean
   title: String
 }
 
@@ -1027,6 +1131,7 @@ type Conference {
   registrationDeadline: Time
   files: [File!]!
   eventsCount: Int!
+  ticketPrice: Int
 }
 
 type ConferencesMetrics {
@@ -1081,6 +1186,7 @@ input CreateConferenceInput {
   registrationDeadline: Time
   agenda: [CreateAgendaItemInput!]
   files: [CreateConferenceInputFile!]
+  ticketPrice: Int
 }
 
 input ModifyAgendaItemInput {
@@ -1106,6 +1212,7 @@ input ModifyConferenceInput {
   registrationDeadline: Time
   agenda: [ModifyAgendaItemInput!]
   files: [ModifyConferenceInputFile!]
+  ticketPrice: Int
 }
 
 extend type Query {
@@ -1121,7 +1228,7 @@ extend type Mutation {
   createConference(createConferenceInput: CreateConferenceInput!): ID!
     @hasRole(role: Organizer)
   modifyConference(input: ModifyConferenceInput!): ID! @hasRole(role: Organizer)
-  addUserToConference(conferenceId: ID!): ID! @hasRole(role: Participant)
+  addUserToConference(conferenceId: ID!): String @hasRole(role: Participant)
   removeUserFromConference(conferenceId: ID!): ID! @hasRole(role: Participant)
 }
 `, BuiltIn: false},
@@ -1163,7 +1270,7 @@ type TermsOfService {
 }
 
 extend type Query {
-  news(page: Page): NewsPage! @authenticated
+  news(page: Page!): NewsPage! @authenticated
   termsAndConditions: TermsOfService! @authenticated
 }
 `, BuiltIn: false},
@@ -1228,6 +1335,16 @@ type OrganizerMetrics {
   newParticipantsTrend: [NewParticipantsTrend!]!
 }
 
+type Ticket {
+  id: String!
+  conference: Conference!
+}
+
+type TicketsPage {
+  data: [Ticket!]!
+  meta: PageInfo!
+}
+
 type User {
   id: ID!
   name: String
@@ -1236,6 +1353,13 @@ type User {
   email: String!
   role: Role!
   metrics: OrganizerMetrics @hasRole(role: Organizer)
+  tickets(page: Page!): TicketsPage! @hasRole(role: Participant)
+  stripeAccountDetails: StripeAccountDetails @hasRole(role: Organizer)
+}
+
+type StripeAccountDetails {
+  id: String!
+  isVerified: Boolean!
 }
 
 extend type Query {
@@ -1264,7 +1388,10 @@ input UpdateUserInput {
 extend type Mutation {
   updateSession: String! @authenticated
   loginUser(loginUserInput: LoginUserInput!): String!
-  registerUser(registerUserInput: RegisterUserInput!): String!
+  registerUser(registerUserInput: RegisterUserInput!): ID!
+  stripeOnboard(returnUrl: String!, refreshUrl: String!): String!
+    @hasRole(role: Organizer)
+  logout: Boolean! @authenticated
   updateUser(updateUserInput: UpdateUserInput!): ID! @authenticated
   editPassword(password: String!): Boolean @authenticated
 }
@@ -1396,6 +1523,30 @@ func (ec *executionContext) field_Mutation_removeUserFromConference_args(ctx con
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_stripeOnboard_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["returnUrl"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("returnUrl"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["returnUrl"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["refreshUrl"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("refreshUrl"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["refreshUrl"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -1492,10 +1643,25 @@ func (ec *executionContext) field_Query_isUserAssociatedWithConference_args(ctx 
 func (ec *executionContext) field_Query_news_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *models.Page
+	var arg0 models.Page
 	if tmp, ok := rawArgs["page"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("page"))
-		arg0, err = ec.unmarshalOPage2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐPage(ctx, tmp)
+		arg0, err = ec.unmarshalNPage2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐPage(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["page"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_User_tickets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 models.Page
+	if tmp, ok := rawArgs["page"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("page"))
+		arg0, err = ec.unmarshalNPage2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐPage(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -2383,6 +2549,47 @@ func (ec *executionContext) fieldContext_Conference_eventsCount(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Conference_ticketPrice(ctx context.Context, field graphql.CollectedField, obj *models.Conference) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Conference_ticketPrice(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TicketPrice, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Conference_ticketPrice(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Conference",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ConferenceMeta_page(ctx context.Context, field graphql.CollectedField, obj *models.ConferenceMeta) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ConferenceMeta_page(ctx, field)
 	if err != nil {
@@ -2680,6 +2887,8 @@ func (ec *executionContext) fieldContext_ConferencesPage_data(ctx context.Contex
 				return ec.fieldContext_Conference_files(ctx, field)
 			case "eventsCount":
 				return ec.fieldContext_Conference_eventsCount(ctx, field)
+			case "ticketPrice":
+				return ec.fieldContext_Conference_ticketPrice(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Conference", field.Name)
 		},
@@ -3114,24 +3323,21 @@ func (ec *executionContext) _Mutation_addUserToConference(ctx context.Context, f
 		if tmp == nil {
 			return nil, nil
 		}
-		if data, ok := tmp.(int); ok {
+		if data, ok := tmp.(*string); ok {
 			return data, nil
 		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be int`, tmp)
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *string`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(int)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalNID2int(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_addUserToConference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3141,7 +3347,7 @@ func (ec *executionContext) fieldContext_Mutation_addUserToConference(ctx contex
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	defer func() {
@@ -3382,12 +3588,91 @@ func (ec *executionContext) _Mutation_registerUser(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNID2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_registerUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_registerUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_stripeOnboard(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_stripeOnboard(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().StripeOnboard(rctx, fc.Args["returnUrl"].(string), fc.Args["refreshUrl"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			role, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, "Organizer")
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.HasRole == nil {
+				return nil, errors.New("directive hasRole is not implemented")
+			}
+			return ec.directives.HasRole(ctx, nil, directive0, role)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(string); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be string`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
 	res := resTmp.(string)
 	fc.Result = res
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_registerUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_stripeOnboard(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -3404,9 +3689,73 @@ func (ec *executionContext) fieldContext_Mutation_registerUser(ctx context.Conte
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_registerUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_stripeOnboard_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_logout(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().Logout(rctx)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Authenticated == nil {
+				return nil, errors.New("directive authenticated is not implemented")
+			}
+			return ec.directives.Authenticated(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(bool); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be bool`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_logout(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
 	}
 	return fc, nil
 }
@@ -4467,6 +4816,8 @@ func (ec *executionContext) fieldContext_Query_conference(ctx context.Context, f
 				return ec.fieldContext_Conference_files(ctx, field)
 			case "eventsCount":
 				return ec.fieldContext_Conference_eventsCount(ctx, field)
+			case "ticketPrice":
+				return ec.fieldContext_Conference_ticketPrice(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Conference", field.Name)
 		},
@@ -4583,7 +4934,7 @@ func (ec *executionContext) _Query_news(ctx context.Context, field graphql.Colle
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		directive0 := func(rctx context.Context) (interface{}, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().News(rctx, fc.Args["page"].(*models.Page))
+			return ec.resolvers.Query().News(rctx, fc.Args["page"].(models.Page))
 		}
 		directive1 := func(ctx context.Context) (interface{}, error) {
 			if ec.directives.Authenticated == nil {
@@ -4795,6 +5146,10 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 				return ec.fieldContext_User_role(ctx, field)
 			case "metrics":
 				return ec.fieldContext_User_metrics(ctx, field)
+			case "tickets":
+				return ec.fieldContext_User_tickets(ctx, field)
+			case "stripeAccountDetails":
+				return ec.fieldContext_User_stripeAccountDetails(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
@@ -5146,7 +5501,7 @@ func (ec *executionContext) _Section_subsections(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Section().Subsections(rctx, obj)
+		return obj.Subsections, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5167,8 +5522,8 @@ func (ec *executionContext) fieldContext_Section_subsections(ctx context.Context
 	fc = &graphql.FieldContext{
 		Object:     "Section",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -5179,6 +5534,94 @@ func (ec *executionContext) fieldContext_Section_subsections(ctx context.Context
 				return ec.fieldContext_SubSection_content(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SubSection", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StripeAccountDetails_id(ctx context.Context, field graphql.CollectedField, obj *models.StripeAccountDetails) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StripeAccountDetails_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StripeAccountDetails_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StripeAccountDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StripeAccountDetails_isVerified(ctx context.Context, field graphql.CollectedField, obj *models.StripeAccountDetails) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StripeAccountDetails_isVerified(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsVerified, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StripeAccountDetails_isVerified(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StripeAccountDetails",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5506,7 +5949,7 @@ func (ec *executionContext) _TermsOfService_sections(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.TermsOfService().Sections(rctx, obj)
+		return obj.Sections, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5527,8 +5970,8 @@ func (ec *executionContext) fieldContext_TermsOfService_sections(ctx context.Con
 	fc = &graphql.FieldContext{
 		Object:     "TermsOfService",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -5541,6 +5984,230 @@ func (ec *executionContext) fieldContext_TermsOfService_sections(ctx context.Con
 				return ec.fieldContext_Section_subsections(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Section", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Ticket_id(ctx context.Context, field graphql.CollectedField, obj *models.Ticket) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Ticket_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Ticket_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Ticket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Ticket_conference(ctx context.Context, field graphql.CollectedField, obj *models.Ticket) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Ticket_conference(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Conference, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.Conference)
+	fc.Result = res
+	return ec.marshalNConference2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐConference(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Ticket_conference(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Ticket",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Conference_id(ctx, field)
+			case "title":
+				return ec.fieldContext_Conference_title(ctx, field)
+			case "startDate":
+				return ec.fieldContext_Conference_startDate(ctx, field)
+			case "endDate":
+				return ec.fieldContext_Conference_endDate(ctx, field)
+			case "location":
+				return ec.fieldContext_Conference_location(ctx, field)
+			case "website":
+				return ec.fieldContext_Conference_website(ctx, field)
+			case "acronym":
+				return ec.fieldContext_Conference_acronym(ctx, field)
+			case "additionalInfo":
+				return ec.fieldContext_Conference_additionalInfo(ctx, field)
+			case "agenda":
+				return ec.fieldContext_Conference_agenda(ctx, field)
+			case "participantsCount":
+				return ec.fieldContext_Conference_participantsCount(ctx, field)
+			case "participantsLimit":
+				return ec.fieldContext_Conference_participantsLimit(ctx, field)
+			case "registrationDeadline":
+				return ec.fieldContext_Conference_registrationDeadline(ctx, field)
+			case "files":
+				return ec.fieldContext_Conference_files(ctx, field)
+			case "eventsCount":
+				return ec.fieldContext_Conference_eventsCount(ctx, field)
+			case "ticketPrice":
+				return ec.fieldContext_Conference_ticketPrice(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Conference", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TicketsPage_data(ctx context.Context, field graphql.CollectedField, obj *models.TicketsPage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TicketsPage_data(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Data, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.Ticket)
+	fc.Result = res
+	return ec.marshalNTicket2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐTicketᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TicketsPage_data(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TicketsPage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Ticket_id(ctx, field)
+			case "conference":
+				return ec.fieldContext_Ticket_conference(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Ticket", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TicketsPage_meta(ctx context.Context, field graphql.CollectedField, obj *models.TicketsPage) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TicketsPage_meta(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Meta, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TicketsPage_meta(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TicketsPage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "totalItems":
+				return ec.fieldContext_PageInfo_totalItems(ctx, field)
+			case "totalPages":
+				return ec.fieldContext_PageInfo_totalPages(ctx, field)
+			case "number":
+				return ec.fieldContext_PageInfo_number(ctx, field)
+			case "size":
+				return ec.fieldContext_PageInfo_size(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
 		},
 	}
 	return fc, nil
@@ -5873,6 +6540,162 @@ func (ec *executionContext) fieldContext_User_metrics(ctx context.Context, field
 				return ec.fieldContext_OrganizerMetrics_newParticipantsTrend(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type OrganizerMetrics", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_tickets(ctx context.Context, field graphql.CollectedField, obj *models.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_tickets(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.User().Tickets(rctx, obj, fc.Args["page"].(models.Page))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			role, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, "Participant")
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.HasRole == nil {
+				return nil, errors.New("directive hasRole is not implemented")
+			}
+			return ec.directives.HasRole(ctx, obj, directive0, role)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*models.TicketsPage); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.TicketsPage`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.TicketsPage)
+	fc.Result = res
+	return ec.marshalNTicketsPage2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐTicketsPage(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_tickets(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "data":
+				return ec.fieldContext_TicketsPage_data(ctx, field)
+			case "meta":
+				return ec.fieldContext_TicketsPage_meta(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TicketsPage", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_User_tickets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_stripeAccountDetails(ctx context.Context, field graphql.CollectedField, obj *models.User) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_User_stripeAccountDetails(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.User().StripeAccountDetails(rctx, obj)
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			role, err := ec.unmarshalNRole2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐRole(ctx, "Organizer")
+			if err != nil {
+				return nil, err
+			}
+			if ec.directives.HasRole == nil {
+				return nil, errors.New("directive hasRole is not implemented")
+			}
+			return ec.directives.HasRole(ctx, obj, directive0, role)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*models.StripeAccountDetails); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/maciejas22/conference-manager/api/internal/models.StripeAccountDetails`, tmp)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.StripeAccountDetails)
+	fc.Result = res
+	return ec.marshalOStripeAccountDetails2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐStripeAccountDetails(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_User_stripeAccountDetails(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_StripeAccountDetails_id(ctx, field)
+			case "isVerified":
+				return ec.fieldContext_StripeAccountDetails_isVerified(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type StripeAccountDetails", field.Name)
 		},
 	}
 	return fc, nil
@@ -7706,7 +8529,7 @@ func (ec *executionContext) unmarshalInputConferencesFilters(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"associatedOnly", "title"}
+	fieldsInOrder := [...]string{"associatedOnly", "runningOnly", "title"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -7720,6 +8543,13 @@ func (ec *executionContext) unmarshalInputConferencesFilters(ctx context.Context
 				return it, err
 			}
 			it.AssociatedOnly = data
+		case "runningOnly":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("runningOnly"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.RunningOnly = data
 		case "title":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("title"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -7767,7 +8597,7 @@ func (ec *executionContext) unmarshalInputCreateConferenceInput(ctx context.Cont
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"title", "startDate", "endDate", "location", "website", "acronym", "additionalInfo", "participantsLimit", "registrationDeadline", "agenda", "files"}
+	fieldsInOrder := [...]string{"title", "startDate", "endDate", "location", "website", "acronym", "additionalInfo", "participantsLimit", "registrationDeadline", "agenda", "files", "ticketPrice"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -7851,6 +8681,13 @@ func (ec *executionContext) unmarshalInputCreateConferenceInput(ctx context.Cont
 				return it, err
 			}
 			it.Files = data
+		case "ticketPrice":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ticketPrice"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TicketPrice = data
 		}
 	}
 
@@ -7986,7 +8823,7 @@ func (ec *executionContext) unmarshalInputModifyConferenceInput(ctx context.Cont
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"id", "title", "startDate", "endDate", "location", "website", "acronym", "additionalInfo", "participantsLimit", "registrationDeadline", "agenda", "files"}
+	fieldsInOrder := [...]string{"id", "title", "startDate", "endDate", "location", "website", "acronym", "additionalInfo", "participantsLimit", "registrationDeadline", "agenda", "files", "ticketPrice"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -8077,6 +8914,13 @@ func (ec *executionContext) unmarshalInputModifyConferenceInput(ctx context.Cont
 				return it, err
 			}
 			it.Files = data
+		case "ticketPrice":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ticketPrice"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TicketPrice = data
 		}
 	}
 
@@ -8565,6 +9409,8 @@ func (ec *executionContext) _Conference(ctx context.Context, sel ast.SelectionSe
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "ticketPrice":
+			out.Values[i] = ec._Conference_ticketPrice(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8847,9 +9693,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_addUserToConference(ctx, field)
 			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "removeUserFromConference":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_removeUserFromConference(ctx, field)
@@ -8874,6 +9717,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "registerUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_registerUser(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "stripeOnboard":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_stripeOnboard(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "logout":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_logout(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -9430,48 +10287,61 @@ func (ec *executionContext) _Section(ctx context.Context, sel ast.SelectionSet, 
 		case "id":
 			out.Values[i] = ec._Section_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "title":
 			out.Values[i] = ec._Section_title(ctx, field, obj)
 		case "content":
 			out.Values[i] = ec._Section_content(ctx, field, obj)
 		case "subsections":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Section_subsections(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
+			out.Values[i] = ec._Section_subsections(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
 
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
 
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var stripeAccountDetailsImplementors = []string{"StripeAccountDetails"}
+
+func (ec *executionContext) _StripeAccountDetails(ctx context.Context, sel ast.SelectionSet, obj *models.StripeAccountDetails) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, stripeAccountDetailsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StripeAccountDetails")
+		case "id":
+			out.Values[i] = ec._StripeAccountDetails_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
 			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "isVerified":
+			out.Values[i] = ec._StripeAccountDetails_isVerified(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -9558,59 +10428,116 @@ func (ec *executionContext) _TermsOfService(ctx context.Context, sel ast.Selecti
 		case "id":
 			out.Values[i] = ec._TermsOfService_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "updatedAt":
 			out.Values[i] = ec._TermsOfService_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "introduction":
 			out.Values[i] = ec._TermsOfService_introduction(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "acknowledgement":
 			out.Values[i] = ec._TermsOfService_acknowledgement(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
+				out.Invalids++
 			}
 		case "sections":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._TermsOfService_sections(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
+			out.Values[i] = ec._TermsOfService_sections(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
 
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
 
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var ticketImplementors = []string{"Ticket"}
+
+func (ec *executionContext) _Ticket(ctx context.Context, sel ast.SelectionSet, obj *models.Ticket) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, ticketImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Ticket")
+		case "id":
+			out.Values[i] = ec._Ticket_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
 			}
+		case "conference":
+			out.Values[i] = ec._Ticket_conference(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
 
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var ticketsPageImplementors = []string{"TicketsPage"}
+
+func (ec *executionContext) _TicketsPage(ctx context.Context, sel ast.SelectionSet, obj *models.TicketsPage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, ticketsPageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TicketsPage")
+		case "data":
+			out.Values[i] = ec._TicketsPage_data(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "meta":
+			out.Values[i] = ec._TicketsPage_meta(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -9676,6 +10603,75 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 					}
 				}()
 				res = ec._User_metrics(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "tickets":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_tickets(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "stripeAccountDetails":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_stripeAccountDetails(ctx, field, obj)
 				return res
 			}
 
@@ -10489,6 +11485,11 @@ func (ec *executionContext) marshalNOrder2githubᚗcomᚋmaciejas22ᚋconference
 	return v
 }
 
+func (ec *executionContext) unmarshalNPage2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐPage(ctx context.Context, v interface{}) (models.Page, error) {
+	res, err := ec.unmarshalInputPage(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *models.PageInfo) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -10649,6 +11650,74 @@ func (ec *executionContext) marshalNTermsOfService2ᚖgithubᚗcomᚋmaciejas22�
 		return graphql.Null
 	}
 	return ec._TermsOfService(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNTicket2ᚕᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐTicketᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Ticket) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNTicket2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐTicket(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTicket2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐTicket(ctx context.Context, sel ast.SelectionSet, v *models.Ticket) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Ticket(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNTicketsPage2githubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐTicketsPage(ctx context.Context, sel ast.SelectionSet, v models.TicketsPage) graphql.Marshaler {
+	return ec._TicketsPage(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTicketsPage2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐTicketsPage(ctx context.Context, sel ast.SelectionSet, v *models.TicketsPage) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TicketsPage(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v interface{}) (time.Time, error) {
@@ -11123,6 +12192,13 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	}
 	res := graphql.MarshalString(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOStripeAccountDetails2ᚖgithubᚗcomᚋmaciejas22ᚋconferenceᚑmanagerᚋapiᚋinternalᚋmodelsᚐStripeAccountDetails(ctx context.Context, sel ast.SelectionSet, v *models.StripeAccountDetails) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._StripeAccountDetails(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOTime2ᚖtimeᚐTime(ctx context.Context, v interface{}) (*time.Time, error) {

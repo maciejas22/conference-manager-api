@@ -22,7 +22,10 @@ func NewS3Client(ctx context.Context, logger *slog.Logger) (*S3Client, error) {
 		return nil, err
 	}
 
-	s3Client := s3.NewFromConfig(s3Cfg)
+	s3Client := s3.NewFromConfig(s3Cfg, func(o *s3.Options) {
+		o.UsePathStyle = true
+	})
+
 	return &S3Client{
 		s3:     s3Client,
 		logger: logger,

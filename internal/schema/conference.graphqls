@@ -1,5 +1,6 @@
 input ConferencesFilters {
   associatedOnly: Boolean
+  runningOnly: Boolean
   title: String
 }
 
@@ -18,6 +19,7 @@ type Conference {
   registrationDeadline: Time
   files: [File!]!
   eventsCount: Int!
+  ticketPrice: Int
 }
 
 type ConferencesMetrics {
@@ -72,6 +74,7 @@ input CreateConferenceInput {
   registrationDeadline: Time
   agenda: [CreateAgendaItemInput!]
   files: [CreateConferenceInputFile!]
+  ticketPrice: Int
 }
 
 input ModifyAgendaItemInput {
@@ -97,6 +100,7 @@ input ModifyConferenceInput {
   registrationDeadline: Time
   agenda: [ModifyAgendaItemInput!]
   files: [ModifyConferenceInputFile!]
+  ticketPrice: Int
 }
 
 extend type Query {
@@ -112,6 +116,6 @@ extend type Mutation {
   createConference(createConferenceInput: CreateConferenceInput!): ID!
     @hasRole(role: Organizer)
   modifyConference(input: ModifyConferenceInput!): ID! @hasRole(role: Organizer)
-  addUserToConference(conferenceId: ID!): ID! @hasRole(role: Participant)
+  addUserToConference(conferenceId: ID!): String @hasRole(role: Participant)
   removeUserFromConference(conferenceId: ID!): ID! @hasRole(role: Participant)
 }

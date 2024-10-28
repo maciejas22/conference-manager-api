@@ -53,3 +53,16 @@ func CreateSession(tx *sqlx.Tx, sessionId string, userId int) (*string, error) {
 	}
 	return &sessionId, nil
 }
+
+func DeleteUserSession(tx *sqlx.Tx, usedId int) error {
+	s := &Session{}
+	query := `
+    DELETE FROM ` + s.TableName() + `
+    WHERE user_id = $1
+  `
+	_, err := tx.Exec(query, usedId)
+	if err != nil {
+		return errors.New("could not destroy session")
+	}
+	return nil
+}

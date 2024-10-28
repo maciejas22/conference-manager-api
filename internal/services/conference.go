@@ -34,6 +34,7 @@ func CreateConference(ctx context.Context, dbClient *db.DB, s3 *s3.S3Client, use
 			AdditionalInfo:       createConferenceInput.AdditionalInfo,
 			ParticipantsLimit:    createConferenceInput.ParticipantsLimit,
 			RegistrationDeadline: deadlineString,
+			TicketPrice:          createConferenceInput.TicketPrice,
 		}, userId)
 		if err != nil {
 			return err
@@ -97,6 +98,7 @@ func ModifyConference(ctx context.Context, dbClient *db.DB, s3 *s3.S3Client, inp
 			AdditionalInfo:       input.AdditionalInfo,
 			ParticipantsLimit:    input.ParticipantsLimit,
 			RegistrationDeadline: deadlineString,
+			TicketPrice:          input.TicketPrice,
 		})
 		if err != nil {
 			return err
@@ -191,6 +193,7 @@ func GetAllConferences(ctx context.Context, dbClient *db.DB, userId int, p *mode
 		filters = &repositories.ConferenceFilter{
 			Title:          f.Title,
 			AssociatedOnly: f.AssociatedOnly,
+			RunningOnly:    f.RunningOnly,
 		}
 	}
 
@@ -245,6 +248,7 @@ func GetAllConferences(ctx context.Context, dbClient *db.DB, userId int, p *mode
 			AdditionalInfo:       conference.AdditionalInfo,
 			ParticipantsLimit:    conference.ParticipantsLimit,
 			RegistrationDeadline: registrationDeadline,
+			TicketPrice:          conference.TicketPrice,
 		})
 	}
 
@@ -306,6 +310,7 @@ func GetConference(ctx context.Context, dbClient *db.DB, id int) (*models.Confer
 		AdditionalInfo:       c.AdditionalInfo,
 		ParticipantsLimit:    c.ParticipantsLimit,
 		RegistrationDeadline: registrationDeadline,
+		TicketPrice:          c.TicketPrice,
 	}, nil
 }
 

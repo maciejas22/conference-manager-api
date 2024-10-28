@@ -88,6 +88,10 @@ models:
     fields:
       metrics:
         resolver: true
+      tickets:
+        resolver: true
+      stripeAccountDetails:
+        resolver: true
   OrganizerMetrics:
     fields:
       newParticipantsTrend:
@@ -105,12 +109,4 @@ models:
   ConferencesPage:
     fields:
       metrics:
-        resolver: true
-  TermsOfService:
-    fields:
-      sections:
-        resolver: true
-  Section:
-    fields:
-      subsections:
         resolver: true

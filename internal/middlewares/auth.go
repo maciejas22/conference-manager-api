@@ -84,6 +84,7 @@ func AuthMiddleware(dbClient *db.DB) func(http.Handler) http.Handler {
 				}
 
 				sessionInfo.UserId = user.Id
+				sessionInfo.StripeAccountId = user.StripeAccountId
 				sessionInfo.Role = user.Role
 
 				return nil

@@ -6,6 +6,7 @@ package resolvers
 
 import (
 	"context"
+	"time"
 
 	"github.com/maciejas22/conference-manager/api/internal/auth"
 	"github.com/maciejas22/conference-manager/api/internal/files"
@@ -62,13 +63,45 @@ func (r *mutationResolver) ModifyConference(ctx context.Context, input models.Mo
 	return *c, nil
 }
 
-func (r *mutationResolver) AddUserToConference(ctx context.Context, conferenceID int) (int, error) {
+func (r *mutationResolver) AddUserToConference(ctx context.Context, conferenceID int) (*string, error) {
 	si := auth.GetSessionInfo(ctx)
-	cId, err := services.AddUserToConference(ctx, r.dbClient, si.UserId, conferenceID)
+
+	c, err := services.GetConference(ctx, r.dbClient, conferenceID)
 	if err != nil {
-		return 0, err
+		return nil, gqlerror.Errorf("Failed to get conference")
 	}
-	return *cId, nil
+
+	if c.TicketPrice == nil || *c.TicketPrice == 0 {
+		services.AddUserToConference(ctx, r.dbClient, si.UserId, conferenceID)
+		return nil, nil
+	}
+
+	pCount, err := services.GetParticipantsCount(ctx, r.dbClient, conferenceID)
+	if err != nil {
+		return nil, gqlerror.Errorf("Failed to get participants count")
+	}
+
+	if c.ParticipantsLimit != nil && pCount >= *c.ParticipantsLimit {
+		return nil, gqlerror.Errorf("Conference is full")
+	}
+	if c.RegistrationDeadline != nil && c.RegistrationDeadline.Before(time.Now()) {
+		return nil, gqlerror.Errorf("Registration deadline has passed")
+	}
+
+	organizerId, err := services.GetConferenceOrganizerId(ctx, r.dbClient, conferenceID)
+	if err != nil {
+		return nil, gqlerror.Errorf("Failed to get conference organizer")
+	}
+	organizerStripeAccountId, err := services.GetStripeAccount(ctx, r.dbClient, organizerId)
+	if err != nil {
+		return nil, gqlerror.Errorf("Failed to get organizer stripe account")
+	}
+	intnet, err := services.CreateConferencePaymentIntent(*c.TicketPrice, services.PaymentIntentMetadata{
+		ConferenceId: conferenceID,
+		UserId:       si.UserId,
+		Destination:  organizerStripeAccountId.ID,
+	})
+	return intnet, err
 }
 
 func (r *mutationResolver) RemoveUserFromConference(ctx context.Context, conferenceID int) (int, error) {
