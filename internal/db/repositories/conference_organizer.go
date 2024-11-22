@@ -91,7 +91,7 @@ type TrendEntry struct {
 func GetParticipantsTrend(tx *sqlx.Tx, organizerId int) ([]TrendEntry, error) {
 	var counts []TrendEntry
 
-	var reportStartDate time.Time
+	var reportStartDate *time.Time
 	query := `
 	  SELECT MIN(c.start_date)
 	  FROM ` + (new(Conference)).TableName() + ` c
@@ -103,7 +103,11 @@ func GetParticipantsTrend(tx *sqlx.Tx, organizerId int) ([]TrendEntry, error) {
 		return counts, err
 	}
 
-	totalDuration := time.Since(reportStartDate)
+	if reportStartDate == nil {
+		return counts, nil
+	}
+
+	totalDuration := time.Since(*reportStartDate)
 	interval := totalDuration / 10
 	if interval.Hours() < 24 {
 		interval = 24 * time.Hour

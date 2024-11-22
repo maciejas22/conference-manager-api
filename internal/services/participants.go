@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -136,7 +137,7 @@ func GetParticipantsJoiningTrend(ctx context.Context, dbClient *db.DB, organizer
 		var err error
 		participantsJoiningTrend, err = repositories.GetParticipantsTrend(tx, organizerId)
 		if err != nil {
-			return err
+			return errors.New("Failed to fetch participants joining trend")
 		}
 
 		return nil
@@ -149,7 +150,7 @@ func GetParticipantsJoiningTrend(ctx context.Context, dbClient *db.DB, organizer
 	for _, trendEntry := range participantsJoiningTrend {
 		date, err := time.Parse(time.RFC3339, trendEntry.Date)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("Failed to parse date")
 		}
 
 		trendEntries = append(trendEntries, &models.NewParticipantsTrend{
