@@ -1,0 +1,78 @@
+enum Role {
+  Organizer
+  Participant
+}
+
+type NewParticipantsTrend {
+  date: Time!
+  newParticipants: Int!
+}
+
+type OrganizerMetrics {
+  runningConferences: Int!
+  participantsCount: Int!
+  averageParticipantsCount: Float!
+  totalOrganizedConferences: Int!
+  newParticipantsTrend: [NewParticipantsTrend!]!
+}
+
+type Ticket {
+  id: String!
+  conference: Conference!
+}
+
+type TicketsPage {
+  data: [Ticket!]!
+  meta: PageInfo!
+}
+
+type User {
+  id: ID!
+  name: String
+  surname: String
+  username: String
+  email: String!
+  role: Role!
+  metrics: OrganizerMetrics @hasRole(role: Organizer)
+  tickets(page: Page!): TicketsPage! @hasRole(role: Participant)
+  stripeAccountDetails: StripeAccountDetails @hasRole(role: Organizer)
+}
+
+type StripeAccountDetails {
+  id: String!
+  isVerified: Boolean!
+}
+
+extend type Query {
+  user: User @authenticated
+  isUserAssociatedWithConference(conferenceId: ID!): Boolean! @authenticated
+}
+
+input LoginUserInput {
+  email: String!
+  password: String!
+}
+
+input RegisterUserInput {
+  email: String!
+  password: String!
+  role: Role!
+}
+
+input UpdateUserInput {
+  name: String!
+  surname: String!
+  username: String!
+  email: String!
+}
+
+extend type Mutation {
+  loginUser(loginUserInput: LoginUserInput!): String!
+  registerUser(registerUserInput: RegisterUserInput!): ID!
+  stripeOnboard(returnUrl: String!, refreshUrl: String!): String!
+    @hasRole(role: Organizer)
+  logout: Boolean! @authenticated
+  updateUser(updateUserInput: UpdateUserInput!): ID! @authenticated
+  editPassword(password: String!): Boolean @authenticated
+  updateSession: String! @authenticated
+}

@@ -1,0 +1,128 @@
+input ConferencesFilters {
+  associatedOnly: Boolean
+  runningOnly: Boolean
+  title: String
+}
+
+type Conference {
+  id: ID!
+  title: String!
+  startDate: Time!
+  endDate: Time!
+  location: String!
+  website: String
+  acronym: String
+  additionalInfo: String
+  agenda: [AgendaItem!]!
+  participantsCount: Int!
+  participantsLimit: Int
+  registrationDeadline: Time
+  files: [File!]!
+  eventsCount: Int!
+  ticketPrice: Int
+}
+
+type ConferencesMetrics {
+  runningConferences: Int!
+  startingInLessThan24Hours: Int!
+  totalConducted: Int!
+  participantsToday: Int!
+}
+
+type ConferencesPage {
+  data: [Conference!]!
+  meta: ConferenceMeta!
+  metrics: ConferencesMetrics!
+}
+
+type ConferenceMeta {
+  page: PageInfo!
+}
+
+type AgendaItem {
+  id: ID!
+  startTime: Time!
+  endTime: Time!
+  event: String!
+  speaker: String!
+}
+
+input AgendaItemInput {
+  startTime: Time!
+  endTime: Time!
+  event: String!
+  speaker: String!
+}
+
+input CreateAgendaItemInput {
+  createItem: AgendaItemInput
+}
+
+input CreateConferenceInputFile {
+  uploadFile: UploadFile
+}
+
+input CreateConferenceInput {
+  title: String!
+  startDate: Time!
+  endDate: Time!
+  location: String!
+  website: String
+  acronym: String
+  additionalInfo: String
+  participantsLimit: Int
+  registrationDeadline: Time
+  agenda: [CreateAgendaItemInput!]
+  files: [CreateConferenceInputFile!]
+  ticketPrice: Int
+}
+
+input ModifyAgendaItemInput {
+  createItem: AgendaItemInput
+  deleteItem: ID
+}
+
+input ModifyConferenceInputFile {
+  uploadFile: UploadFile
+  deleteFile: DeleteFile
+}
+
+input ModifyConferenceInput {
+  id: ID!
+  title: String
+  startDate: Time
+  endDate: Time
+  location: String
+  website: String
+  acronym: String
+  additionalInfo: String
+  participantsLimit: Int
+  registrationDeadline: Time
+  agenda: [ModifyAgendaItemInput!]
+  files: [ModifyConferenceInputFile!]
+  ticketPrice: Int
+}
+
+input ValidateTicketInput {
+  ticketId: String!
+  conferenceId: ID!
+}
+
+extend type Query {
+  conference(id: ID!): Conference! @authenticated
+  conferences(
+    page: Page
+    sort: Sort
+    filters: ConferencesFilters
+  ): ConferencesPage! @authenticated
+}
+
+extend type Mutation {
+  createConference(createConferenceInput: CreateConferenceInput!): ID!
+    @hasRole(role: Organizer)
+  modifyConference(input: ModifyConferenceInput!): ID! @hasRole(role: Organizer)
+  addUserToConference(conferenceId: ID!): String @hasRole(role: Participant)
+  removeUserFromConference(conferenceId: ID!): ID! @hasRole(role: Participant)
+  validateTicket(input: ValidateTicketInput!): Boolean!
+    @hasRole(role: Organizer)
+}
