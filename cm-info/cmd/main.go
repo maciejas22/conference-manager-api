@@ -11,6 +11,7 @@ import (
 	"github.com/maciejas22/conference-manager-api/cm-info/config"
 	"github.com/maciejas22/conference-manager-api/cm-info/internal/db"
 	handler "github.com/maciejas22/conference-manager-api/cm-info/internal/handler"
+	"github.com/maciejas22/conference-manager-api/cm-info/internal/middleware"
 	newsRepo "github.com/maciejas22/conference-manager-api/cm-info/internal/repository/news"
 	tosRepo "github.com/maciejas22/conference-manager-api/cm-info/internal/repository/tos"
 	newsService "github.com/maciejas22/conference-manager-api/cm-info/internal/service/news"
@@ -60,11 +61,14 @@ func main() {
 	if err != nil {
 		logger.Error("APP", "failed to listen on port", config.AppConfig.Port, "error", err)
 	}
+	logger.Info("APP", "listening on port", config.AppConfig.Port)
 
 	newsService := initNewsService(db)
 	tosService := initToSService(db)
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(middleware.UnaryErrorInterceptor(logger)),
+	)
 	handler.NewServer(grpcServer, newsService, tosService)
 
 	if err := grpcServer.Serve(lis); err != nil {

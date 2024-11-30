@@ -367,14 +367,16 @@ func (r *queryResolver) Conference(ctx context.Context, id int32) (*model.Confer
 // Conferences is the resolver for the conferences field.
 func (r *queryResolver) Conferences(ctx context.Context, page *model.Page, sort *model.Sort, filters *model.ConferencesFilters) (*model.ConferencesPage, error) {
 	si := middlewares.GetSessionInfo(ctx)
-	var sortOrder common.Order
+	sortOrder := common.Order_DESC
 	if sort != nil && sort.Order == model.OrderAsc {
 		sortOrder = common.Order_ASC
-	} else {
-		sortOrder = common.Order_DESC
+	}
+	sortColumn := "id"
+	if sort != nil && sort.Column != "" {
+		sortColumn = sort.Column
 	}
 	cSort := &common.Sort{
-		Column: "id",
+		Column: sortColumn,
 		Order:  sortOrder,
 	}
 
