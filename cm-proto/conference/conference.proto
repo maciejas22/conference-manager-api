@@ -1,0 +1,202 @@
+syntax = "proto3";
+
+package conference;
+
+import "google/protobuf/timestamp.proto";
+import "common/common.proto";
+
+option go_package = "github.com/maciejas22/conference-manager-api/cm-proto/conference";
+
+message ConferencesFilters {
+  bool associatedOnly = 1;
+  bool runningOnly = 2;
+  string title = 3;
+}
+
+message Conference {
+  int32 id = 1;
+  string title = 2;
+  google.protobuf.Timestamp startDate = 3;
+  google.protobuf.Timestamp endDate = 4;
+  string location = 5;
+  string website = 6;
+  string acronym = 7;
+  string additionalInfo = 8;
+  google.protobuf.Timestamp registrationDeadline = 9;
+  int32 eventsCount = 10;
+  int32 ticketPrice = 11;
+  int32 participantsLimit = 12;
+  int32 participantsCount = 13;
+}
+
+message ConferencesRequest { repeated int32 conferenceIds = 1; }
+message ConferencesResponse { repeated Conference conferences = 1; }
+
+message ConferencesMetrics {
+  int32 runningConferences = 1;
+  int32 startingInLessThan24Hours = 2;
+  int32 totalConducted = 3;
+  int32 participantsToday = 4;
+}
+
+message ConferencesPage {
+  repeated int32 conferenceIds = 1;
+  ConferenceMeta meta = 2;
+}
+
+message ConferenceMeta { common.PageInfo page = 1; }
+
+message AgendaItem {
+  int32 id = 1;
+  google.protobuf.Timestamp startTime = 2;
+  google.protobuf.Timestamp endTime = 3;
+  string event = 4;
+  string speaker = 5;
+}
+
+message CreateAgendaItemInput {
+  google.protobuf.Timestamp startTime = 1;
+  google.protobuf.Timestamp endTime = 2;
+  string event = 3;
+  string speaker = 4;
+}
+
+message CreateConferenceInput {
+  string title = 1;
+  google.protobuf.Timestamp startDate = 2;
+  google.protobuf.Timestamp endDate = 3;
+  string location = 4;
+  string website = 5;
+  string acronym = 6;
+  string additionalInfo = 7;
+  int32 participantsLimit = 8;
+  google.protobuf.Timestamp registrationDeadline = 9;
+  repeated CreateAgendaItemInput agenda = 10;
+  int32 ticketPrice = 12;
+}
+
+message ModifyAgendaItemInput {
+  CreateAgendaItemInput createItem = 1;
+  int32 deleteItem = 2;
+}
+
+message ModifyConferenceInput {
+  int32 id = 1;
+  string title = 2;
+  google.protobuf.Timestamp startDate = 3;
+  google.protobuf.Timestamp endDate = 4;
+  string location = 5;
+  string website = 6;
+  string acronym = 7;
+  string additionalInfo = 8;
+  int32 participantsLimit = 9;
+  google.protobuf.Timestamp registrationDeadline = 10;
+  repeated ModifyAgendaItemInput agenda = 11;
+  int32 ticketPrice = 13;
+}
+
+message ConferencesPageRequest {
+  int32 userId = 1;
+  common.Page page = 2;
+  common.Sort sort = 3;
+  ConferencesFilters filters = 4;
+}
+message ConferencesPageResponse { ConferencesPage conferencesPage = 1; }
+
+message ConferencesMetricsRequest {}
+message ConferencesMetricsResponse { ConferencesMetrics metrics = 1; }
+
+message CreateConferenceRequest {
+  int32 userId = 1;
+  CreateConferenceInput createConferenceInput = 2;
+}
+message CreateConferenceResponse { int32 conferenceId = 1; }
+
+message ModifyConferenceRequest { ModifyConferenceInput input = 1; }
+message ModifyConferenceResponse { int32 conferenceId = 1; }
+
+message AgendaRequest { int32 conferenceId = 1; }
+message AgendaResponse { repeated AgendaItem agenda = 1; }
+
+message AddUserToConferenceRequest {
+  int32 conferenceId = 1;
+  int32 userId = 2;
+}
+message AddUserToConferenceResponse { string ticketId = 1; }
+
+message RemoveUserFromConferenceRequest {
+  int32 conferenceId = 1;
+  int32 userId = 2;
+}
+message RemoveUserFromConferenceResponse {}
+
+message IsUserAssociatedWithConferenceRequest {
+  int32 conferenceId = 1;
+  int32 userId = 2;
+}
+message IsUserAssociatedWithConferenceResponse { bool isAssociated = 1; }
+
+message GetOrganizerMetricsRequest { int32 userId = 1; }
+message GetOrganizerMetricsResponse {
+  int32 runningConferences = 1;
+  int32 participantsCount = 2;
+  float averageParticipantsCount = 3;
+  int32 totalOrganizedConferences = 4;
+}
+message ParticipantsTrendEntry {
+  google.protobuf.Timestamp date = 1;
+  int32 newParticipants = 2;
+}
+message ParticipantsTrendRequest { int32 userId = 1; }
+message ParticipantsTrendResponse { repeated ParticipantsTrendEntry trend = 1; }
+
+message Ticket {
+  string ticketId = 1;
+  int32 conferenceId = 2;
+}
+message TicketsPage {
+  repeated Ticket data = 1;
+  TicketsPageMeta meta = 2;
+}
+message TicketsPageMeta { common.PageInfo page = 1; }
+message TicketsRequest {
+  int32 userId = 1;
+  common.Page page = 2;
+}
+message TicketsResponse { TicketsPage ticketsPage = 1; }
+
+message GetConferenceOrganizerRequest { int32 conferenceId = 1; }
+message GetConferenceOrganizerResponse { int32 organizerId = 1; }
+
+message ValidateTicketRequest {
+  string ticketId = 1;
+  int32 conferenceId = 2;
+}
+message ValidateTicketResponse { bool isValid = 1; }
+
+service ConferenceService {
+  rpc GetConferences(ConferencesRequest) returns (ConferencesResponse);
+  rpc GetConferenceAgenda(AgendaRequest) returns (AgendaResponse);
+  rpc GetConferencesPage(ConferencesPageRequest)
+      returns (ConferencesPageResponse);
+  rpc GetConferencesMetrics(ConferencesMetricsRequest)
+      returns (ConferencesMetricsResponse);
+  rpc CreateConference(CreateConferenceRequest)
+      returns (CreateConferenceResponse);
+  rpc ModifyConference(ModifyConferenceRequest)
+      returns (ModifyConferenceResponse);
+  rpc AddUserToConference(AddUserToConferenceRequest)
+      returns (AddUserToConferenceResponse);
+  rpc RemoveUserFromConference(RemoveUserFromConferenceRequest)
+      returns (RemoveUserFromConferenceResponse);
+  rpc IsUserAssociatedWithConference(IsUserAssociatedWithConferenceRequest)
+      returns (IsUserAssociatedWithConferenceResponse);
+  rpc GetOrganizerMetrics(GetOrganizerMetricsRequest)
+      returns (GetOrganizerMetricsResponse);
+  rpc GetParticipantsTrend(ParticipantsTrendRequest)
+      returns (ParticipantsTrendResponse);
+  rpc GetTickets(TicketsRequest) returns (TicketsResponse);
+  rpc GetConferenceOrganizer(GetConferenceOrganizerRequest)
+      returns (GetConferenceOrganizerResponse);
+  rpc ValidateTicket(ValidateTicketRequest) returns (ValidateTicketResponse);
+}

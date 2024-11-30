@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package auth;
+
+option go_package = "github.com/maciejas22/conference-manager-api/cm-proto/auth";
+
+enum Role {
+  ROLE_ORGANIZER = 0;
+  ROLE_PARTICIPANT = 1;
+}
+
+message User {
+  int32 userId = 1;
+  string email = 2;
+  Role role = 3;
+  string name = 4;
+  string surname = 5;
+  string username = 6;
+  string stripeAccountId = 7;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+message LoginResponse { string sessionId = 1; }
+
+message UpdateSessionRequest { string sessionId = 1; }
+message UpdateSessionResponse {
+  string sessionId = 1;
+  int32 userId = 2;
+}
+
+message ValidateSessionRequest { string sessionId = 1; }
+message ValidateSessionResponse { bool isValid = 1; }
+
+message LogoutRequest { string sessionId = 1; }
+message LogoutResponse { bool isSuccess = 1; }
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  Role role = 3;
+  string stripeAccountId = 4;
+}
+message RegisterResponse { int32 userId = 1; }
+
+message UserProfileBySessionRequest { string sessionId = 1; }
+message UserProfileBySessionResponse { User user = 1; }
+
+message UpdateUserProfileRequest {
+  int32 userId = 1;
+  string name = 2;
+  string surname = 3;
+  string username = 4;
+  string email = 5;
+  string password = 6;
+}
+message UpdateUserProfileResponse { int32 userId = 1; }
+
+message UserProfileByIdRequest { int32 userId = 1; }
+message UserProfileByIdResponse { User user = 1; }
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc UpdateSession(UpdateSessionRequest) returns (UpdateSessionResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc UpdateUserProfile(UpdateUserProfileRequest)
+      returns (UpdateUserProfileResponse);
+  rpc ValidateSession(ValidateSessionRequest) returns (ValidateSessionResponse);
+  rpc UserProfileBySession(UserProfileBySessionRequest)
+      returns (UserProfileBySessionResponse);
+  rpc UserProfileById(UserProfileByIdRequest) returns (UserProfileByIdResponse);
+}
