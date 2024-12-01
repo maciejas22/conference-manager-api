@@ -8,7 +8,7 @@ gen:
 	go run github.com/99designs/gqlgen generate
 
 build:
-	GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o bin/conference-manager-api cmd/conference-manager-api/main.go
+	GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o main cmd/cm-gateway/main.go
 
 start:
 	go run cmd/conference-manager-api/main.go
