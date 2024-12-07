@@ -265,6 +265,13 @@ func (r *mutationResolver) AddUserToConference(ctx context.Context, conferenceID
 		return nil, gqlerror.Errorf(err.Error())
 	}
 
+	if c.Conferences[0].ParticipantsLimit != 0 && c.Conferences[0].ParticipantsCount >= c.Conferences[0].ParticipantsLimit {
+		return nil, errors.New("Conference is full")
+	}
+	if c.Conferences[0].RegistrationDeadline != nil && c.Conferences[0].RegistrationDeadline.AsTime().Before(time.Now()) {
+		return nil, errors.New("Registration deadline has passed")
+	}
+
 	conference := c.Conferences[0]
 	if conference.TicketPrice == 0 {
 		_, err := r.conferenceServiceClient.AddUserToConference(ctx, &pb.AddUserToConferenceRequest{

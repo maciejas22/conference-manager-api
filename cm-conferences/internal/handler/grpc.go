@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"errors"
 	"log"
 	"time"
 
@@ -286,23 +285,6 @@ func (srv *ConferenceServ) ModifyConference(ctx context.Context, req *pb.ModifyC
 	}, nil
 }
 func (srv *ConferenceServ) AddUserToConference(ctx context.Context, req *pb.AddUserToConferenceRequest) (*pb.AddUserToConferenceResponse, error) {
-	c, err := srv.conferenceService.GetConference(ctx, int(req.ConferenceId))
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	pCount, err := srv.participantService.GetParticipantsCount([]int{int(req.ConferenceId)})
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if c.ParticipantsLimit != nil && pCount[0].ParticipantsCount >= *c.ParticipantsLimit {
-		return nil, errors.New("Conference is full")
-	}
-	if c.RegistrationDeadline != nil && c.RegistrationDeadline.Before(time.Now()) {
-		return nil, errors.New("Registration deadline has passed")
-	}
-
 	tId, err := srv.participantService.AddUserToConference(int(req.UserId), int(req.ConferenceId))
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
