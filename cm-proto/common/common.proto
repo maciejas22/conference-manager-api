@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package common;
+
+option go_package = "github.com/maciejas22/conference-manager-api/cm-proto/common";
+
+enum Order {
+  ASC = 0;
+  DESC = 1;
+}
+
+message Sort {
+  string column = 1;
+  Order order = 2;
+}
+
+message Page {
+  int32 number = 1;
+  int32 size = 2;
+}
+
+message PageInfo {
+  int32 totalItems = 1;
+  int32 totalPages = 2;
+  int32 number = 3;
+  int32 size = 4;
+}

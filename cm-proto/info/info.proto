@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package info;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/maciejas22/conference-manager-api/cm-proto/info";
+
+message Page {
+  int32 number = 1;
+  int32 size = 2;
+}
+
+message PageInfo {
+  int32 total_items = 1;
+  int32 total_pages = 2;
+  int32 number = 3;
+  int32 size = 4;
+}
+
+message NewsItem {
+  int32 id = 1;
+  string title = 2;
+  string content = 3;
+  google.protobuf.Timestamp date = 4;
+}
+
+message NewsPage {
+  repeated NewsItem data = 1;
+  PageInfo meta = 2;
+}
+message NewsRequest { Page page = 1; }
+message NewsResponse { NewsPage news_page = 1; }
+
+message SubSection {
+  int32 id = 1;
+  string title = 2;
+  string content = 3;
+}
+
+message Section {
+  int32 id = 1;
+  string title = 2;
+  string content = 3;
+  repeated SubSection subsections = 4;
+}
+
+message TermsOfService {
+  int32 id = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  string introduction = 3;
+  string acknowledgement = 4;
+  repeated Section sections = 5;
+}
+
+message TermsOfServiceResponse { TermsOfService terms_of_service = 1; }
+
+service InfoService {
+  rpc ListNews(NewsRequest) returns (NewsResponse);
+  rpc GetTermsOfService(google.protobuf.Empty) returns (TermsOfServiceResponse);
+}

@@ -1,0 +1,41 @@
+type News {
+  id: ID!
+  title: String!
+  content: String!
+  date: Time!
+}
+
+type NewsPage {
+  data: [News!]!
+  meta: NewsMeta!
+}
+
+type NewsMeta {
+  page: PageInfo!
+}
+
+type SubSection {
+  id: ID!
+  title: String!
+  content: String!
+}
+
+type Section {
+  id: ID!
+  title: String
+  content: String
+  subsections: [SubSection!]!
+}
+
+type TermsOfService {
+  id: ID!
+  updatedAt: Time!
+  introduction: String!
+  acknowledgement: String!
+  sections: [Section!]!
+}
+
+extend type Query {
+  news(page: Page!): NewsPage! @authenticated
+  termsAndConditions: TermsOfService! @authenticated
+}

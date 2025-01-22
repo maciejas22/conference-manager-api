@@ -1,0 +1,90 @@
+services:
+  cm-conferences-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: cm-conferences-db
+    volumes:
+      - cm_conferences_db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  cm-conferences-api:
+    build:
+      context: .
+      dockerfile: ./cm-conferences/Dockerfile
+    ports:
+      - "8081:8080"
+    env_file:
+      - ./cm-conferences/.env.docker
+    depends_on:
+      - cm-conferences-db
+
+  cm-info-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: cm-info-db
+    volumes:
+      - cm_info_db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+  cm-info-api:
+    build:
+      context: .
+      dockerfile: ./cm-info/Dockerfile
+    ports:
+      - "8082:8080"
+    env_file:
+      - ./cm-info/.env.docker
+    depends_on:
+      - cm-info-db
+
+  cm-auth-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: cm-auth-db
+    volumes:
+      - cm_auth_db_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+  cm-auth-api:
+    build:
+      context: .
+      dockerfile: ./cm-auth/Dockerfile
+    ports:
+      - "8083:8080"
+    env_file:
+      - ./cm-auth/.env.docker
+    depends_on:
+      - cm-auth-db
+
+  cm-gateway-api:
+    build:
+      context: .
+      dockerfile: ./cm-gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./cm-gateway/.env.docker
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - "4566:4566"
+      - "4572:4572"
+    environment:
+      - SERVICES=s3
+      - DEBUG=1
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./scripts/localstack/s3_init.sh:/etc/localstack/init/ready.d/init-s3.sh"
+
+volumes:
+  cm_conferences_db_data:
+  cm_info_db_data:
+  cm_auth_db_data:
