@@ -18,11 +18,10 @@ func chainHttpMiddlewares(middlewares ...func(http.Handler) http.Handler) func(h
 }
 
 func LoadHttpMiddlewares(l *slog.Logger, authService authPb.AuthServiceClient) func(http.Handler) http.Handler {
-	// logginMiddleware := LoggingMiddleware(l)
+	logginMiddleware := LoggingMiddleware(l)
 	authMiddleware := AuthMiddleware(authService)
 
-	// chainedHandler := chainHttpMiddlewares(logginMiddleware, authMiddleware)
-	chainedHandler := chainHttpMiddlewares(authMiddleware)
+	chainedHandler := chainHttpMiddlewares(logginMiddleware, authMiddleware)
 	return chainedHandler
 }
 
