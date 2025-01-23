@@ -9,6 +9,8 @@ services:
       - cm_conferences_db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - cm-network
   cm-conferences-api:
     build:
       context: .
@@ -19,6 +21,8 @@ services:
       - ./cm-conferences/.env.docker
     depends_on:
       - cm-conferences-db
+    networks:
+      - cm-network
 
   cm-info-db:
     image: postgres
@@ -30,6 +34,8 @@ services:
       - cm_info_db_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - cm-network
   cm-info-api:
     build:
       context: .
@@ -40,6 +46,8 @@ services:
       - ./cm-info/.env.docker
     depends_on:
       - cm-info-db
+    networks:
+      - cm-network
 
   cm-auth-db:
     image: postgres
@@ -51,6 +59,8 @@ services:
       - cm_auth_db_data:/var/lib/postgresql/data
     ports:
       - "5434:5432"
+    networks:
+      - cm-network
   cm-auth-api:
     build:
       context: .
@@ -61,6 +71,8 @@ services:
       - ./cm-auth/.env.docker
     depends_on:
       - cm-auth-db
+    networks:
+      - cm-network
 
   cm-gateway-api:
     build:
@@ -70,6 +82,8 @@ services:
       - "8080:8080"
     env_file:
       - ./cm-gateway/.env.docker
+    networks:
+      - cm-network
 
   localstack:
     image: localstack/localstack:latest
@@ -83,6 +97,12 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "./scripts/localstack/s3_init.sh:/etc/localstack/init/ready.d/init-s3.sh"
+    networks:
+      - cm-network
+
+networks:
+  cm-network:
+    external: true
 
 volumes:
   cm_conferences_db_data:
